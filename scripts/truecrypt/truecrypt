@@ -1,0 +1,58 @@
+#! /bin/sh
+
+TC_BIN="/usr/bin/truecrypt"
+TC_VOLUME="/my/volume.tc"
+TC_MOUNT_POINT="/home/foo"
+TC_KEY=""
+
+case "$1" in
+  start)
+	$TC_BIN -t -l $TC_VOLUME 2> /dev/null > /dev/null
+	if [ ! $? -eq 0 ]; then
+		echo  "Mounting Volume $TC_VOLUME"
+		
+		$TC_BIN -t --mount --protect-hidden=no  -k "$TC_KEY" $TC_VOLUME $TC_MOUNT_POINT
+
+		if [ ! $? -eq 0 ]; then
+			echo "Error mounting Volume $TC_VOLUME"
+		else
+			/usr/bin/logger -t truecrypt "$TC_VOLUME mounted"
+			echo "Done"
+		fi
+	else
+		echo "Volume $TC_VOLUME already mounted"
+	fi
+	;;
+  stop)
+
+	$TC_BIN -t -l $TC_VOLUME 2> /dev/null > /dev/null
+	if [  $? -eq 0 ]; then
+		echo -n "Dismounting Volume $TC_VOLUME "
+		
+		$TC_BIN -t -d $TC_VOLUME
+
+		if [ ! $? -eq 0 ]; then
+			echo "Error dismounting Volume $TC_VOLUME"
+		else
+			/usr/bin/logger -t truecrypt "$TC_VOLUME dismounted"
+			echo "Done"
+		fi
+	else
+		echo "Volume $TC_VOLUME not mounted"
+	
+	fi
+	;;
+  status)
+	$TC_BIN -t -l $TC_VOLUME 2> /dev/null > /dev/null
+	if [  $? -eq 0 ]; then
+		echo "$TC_VOLUME is mounted"
+	else
+		echo "$TC_VOLUME is not mounted"
+	fi
+	;;
+  *)
+	echo "Usage: /etc/init.d/truecrypt {start|stop|status}"
+	exit 1
+esac
+
+exit 0
