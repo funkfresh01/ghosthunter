@@ -42,7 +42,42 @@ WOLF_MAIN_DIR=WOLF_HOME_DIR+"etmain/"
 NQ_MAIN_DIRS=['nq','noquarter']
 CAMPAIGN_FILENAME_PATTERN="^scripts\/cmpgn_kw.+\.campaign"
 SRVNAME_PATTERN='\s+name\s+"([\d\w\.]+)"'
-MAPLIST_PATTERN='\s+maps\s+"([\d\w\._\-\;\[\]]+)"'
+MAPLIST_PATTERN='\s+maps\s+"(.+)"'
+DETECT_MAPFILE_PATTERN="(.+\.arena)$"
+MAP_NAME_PATTERN="map\s+\"(.+)\""
+
+
+# returns a tuple with map name and the fila associated
+def mapNameAndFileRelation(zipFile):
+	detectMapRE=re.compile(DETECT_MAPFILE_PATTERN,re.IGNORECASE)
+	getMapNameRE=re.compile(MAP_NAME_PATTERN,re.IGNORECASE)
+	index=0
+	matched=False
+	mapName=""
+	arenaFile=""
+
+	if not zipfile.is_zipfile(WOLF_MAIN_DIR+zipFile):
+		return "CORRUPTED_ZIP",zipFile
+	try:
+	        zipPointer=zipfile.ZipFile(WOLF_MAIN_DIR+zipFile, "r")
+		fileList=zipPointer.namelist()
+		while index < len(fileList) and not matched:
+			arenaFile=detectMapRE.findall(fileList[index])
+			matched=len(arenaFile) > 0
+			index=index+1
+
+	        zipPointer.close()
+	except:
+		print "OOPS!! Error while reading file "+WOLF_MAIN_DIR+zipFile
+		return "CORRUPTED_ZIP",zipFile
+	if matched:
+		# we have the file that contains the REAL map name!! :DDDD
+	        zipPointer=zipfile.ZipFile(WOLF_MAIN_DIR+zipFile, "r")
+		mapName=getMapNameRE.findall(zipPointer.read(arenaFile[0]))[0]
+	        zipPointer.close()
+		return mapName.lower(), zipFile
+	else:
+		return "PATCHES_OR_ADDONS",zipFile
 
 
 # return a list of campaing files
@@ -99,7 +134,7 @@ def createMapDict(fileList):
 	mapDict={}
 	for file in fileList:
 		server,mapList=fetchMaps(file)
-		mapDict[server]=mapList
+		mapDict[server]=map(lambda x: x.lower(),mapList)
 	return mapDict
 
 
@@ -112,18 +147,31 @@ def listDownloadedMaps():
 	list=filter(lambda x:  re.match("^.*\.pk3$",x) !=None and re.match("^(z_|pak)",x) ==None ,dirListing)
 	list.sort()
 	return list
-def getUnusedMaps(fullMapList,srvMapDic):
-	badNameMap=[]
-	for server in srvMapDic:
-		for map in  srvMapDic[server]:
-			try:
-				fullMapList.remove(map+'.pk3')
-			except:
-				badNameMap.append(map+'.pk3')
-	return badNameMap	
+
+
+def deleteUsedMaps(mapDict,storedMaps):
+	for server in mapDict:
+		for  mapName in mapDict[server]:
+			try: storedMaps.pop(mapName)
+			except: pass
+
+
+
+def downloadedMapsDictionary():
+	storedMaps={}
+	mapName=""
+	mapFile=""
+	for mapName, mapFile in map(mapNameAndFileRelation,listDownloadedMaps()):
+		try: storedMaps[mapName].append(mapFile)
+		except: storedMaps[mapName]=[mapFile]
+	return storedMaps
+
+
 
 def main(argv=None):
 	mapDict={}
+	storedMaps={}
+
 	if not os.path.isdir(WOLF_HOME_DIR):
 		print WOLF_HOME_DIR+" directory does not exist. Are you sure you are playing ET? ^^"
 		sys.exit(1)
@@ -140,42 +188,62 @@ def main(argv=None):
 	if fileList == None:
 		print "Ops I can't find the campaing files!! oO"
 		sys.exit(1)
+	
 	mapDict=createMapDict(fileList)
-	mapList=listDownloadedMaps()
+	storedMaps=downloadedMapsDictionary()
 
+	print """
+ __                                       _____  _____       
+|  | __ ___________  ______  _  _______ _/ ____\/ ____\____  
+|  |/ // __ \_  __ \/    \ \/ \/ /\__  \\\   __\\\   __\/ __ \ 
+|    <\  ___/|  | \/   |  \     /  / __ \|  |   |  | \  ___/ 
+|__|_ \\\___  >__|  |___|  /\/\_/  (____  /__|   |__|  \___  >
+     \/    \/           \/             \/                 \/ 
+
+Rulez (tm)
+"""
 	print ""
 	print "MAPS LOADED IN KERNWAFFE SERVERS"
 	print "--------------------------------"
-	print ""
-
 	for server in mapDict:
-		print "Map listing for server %s:\n%s\n" % (server,' '.join((mapDict[server])))
+		print "\nMap listing for server %s:" % (server)
+		for mapName in mapDict[server]:
+			try:
+				# It will fail if we are using a original map, like fueldump
+				# upper case problems, etc. WET SUCKS :DD
+				print "%s ==> %s" % (mapName,' '.join((storedMaps[mapName])))
+			except:
+				print "ERR map name '%s' does not correspond to any downloaded map in etmain folder. Weird, no?" % (mapName)
+				
 
+	deleteUsedMaps(mapDict,storedMaps)
 
-	# used maps that we were unable to delete from the map list.
-	# It may happen if:
-	# - the same map is being played in more than one server
-	# - the map name and the file name are different 
-	badNames=getUnusedMaps(mapList,mapDict)
-
-	
 	print ""
-	print "MAPS THAT YOU MAY NOT BE USING"
-	print "------------------------------"
+	print "CORRUPTED MAPS DETECTED"
+	print "-----------------------"
+	print "We were unable to open the following maps (zip files):"
+	try:
+		print "%s" % ('\n'.join((storedMaps['CORRUPTED_ZIP'])))
+		storedMaps.pop('CORRUPTED_ZIP')
+	except: pass
+
 	print ""
-	print "Errors found:"
-	print """I tried to delete the following maps from the unused list but an error was found. It may happen if:
-	- the same map is being played in more than one server
-	- the map name and the file name in etmain folder are different"""
-	print "\nCheck carefully the maps marked as not being used, before deletting anything. I am not responsible if you break your config!! :p\n"
-	print "maps marked as 'broken':\n%s" %(' '.join(badNames))
-	print "\n\n"
-	print "Maps not being used:\n\n%s:\n" % ('\n'.join(mapList))
+	print "FILES DETECTED AS SERVICE PACKS OR ADDONS"
+	print "-----------------------------------------"
+	try:
+		print "%s" % ('\n'.join((storedMaps['PATCHES_OR_ADDONS'])))
+		storedMaps.pop('PATCHES_OR_ADDONS')
+	except: pass
+
+	print ""
+	print "MAPS NOT BEING USED"
+	print "-------------------"
+	try:
+		for unusedMap in storedMaps: print "%s ==> %s" % (unusedMap,' '.join((storedMaps[unusedMap])))
+	except: pass
+
 
 if __name__ == "__main__":
 	sys.exit(main())
-
-
-
 
 
