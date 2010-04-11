@@ -8,7 +8,7 @@ It uses a http proxy to connect to the Tor network without implementing the full
 Disclaimer
 ----------
 This is only a proof of concept and only can be used with written permission and
-to test the security for your own intrastructure.
+to test the security of your own intrastructure.
 
 
 Setup
