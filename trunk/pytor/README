@@ -1,0 +1,47 @@
+Pytor
+-----
+A very simple http connect back shell that connects to a Tor hidden service.
+
+It uses a http proxy to connect to the Tor network without implementing the full protocol.
+
+
+Setup
+-----
+
+The python scripts are located in the src subdirectory.
+
+* Server: 
+The user must install Tor in a computer and setup a hidden service as described in the Tor manual.
+
+http://www.torproject.org/docs/tor-hidden-service.html.en
+
+Pytor will listen in 127.0.0.1:8080 for connections.
+
+
+Note: You must change the variable called passwd and put your own.
+
+* Client:
+Change:
+- The variable called hidden_service for the hidden service you installed in your computer.
+- The variable called passwd and put your own.
+
+
+Usage
+-----
+The server runs without parameters and it will prompt for commands as soon as a client connects.
+The client connects just one time in case it is called without parameters, but this behavior
+can be changed with the -c flag.
+
+Use the command "quit" to finish the client execution
+
+
+Freezing Pytor
+--------------
+Execute 'make' in the main directory and the code will be compiled and the binaries copied  to
+the bin directory.
+
+
+Gotcha
+------
+The client may experience problems connecting to the server in case your Tor tunnel is too slow because
+the proxy server has a low time out.
