@@ -67,8 +67,8 @@ def contact_server():
 
 def usage():
 	print """client.py <-c seconds> 
-	It will request a comment and execute it, for every execution.
-        In case of using -c it will continuously request commands to the server.
+	It will request a command and execute it, for every time the script is executed.
+        In case of using -c, it will continuously request commands to the server.
 
 	-c seconds. Time that the client will wait until the next connection attempt
         """
