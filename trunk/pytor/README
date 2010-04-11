@@ -5,6 +5,12 @@ A very simple http connect back shell that connects to a Tor hidden service.
 It uses a http proxy to connect to the Tor network without implementing the full protocol.
 
 
+Disclaimer
+----------
+This is only a proof of concept and only can be used with written permission and
+to test the security for your own intrastructure.
+
+
 Setup
 -----
 
