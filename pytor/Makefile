@@ -15,4 +15,5 @@ server:
 	cd ..
 
 clean:
-	rm -rf build* bin* *.pyc
+	rm -rf build* bin*
+	find . -name "*.pyc" -exec rm -rf {} \;
