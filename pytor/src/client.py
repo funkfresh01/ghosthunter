@@ -1,4 +1,4 @@
-#! /usr/bin/env python
+#! /usr/bin/env python xavi.garcia@gmail.com
 # 
 # Copyright (c) 2010 Xavier Garcia
 # All rights reserved.
