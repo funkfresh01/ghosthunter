@@ -1,6 +1,6 @@
-#! /usr/bin/env python xavi.garcia@gmail.com
+#! /usr/bin/env python 
 # 
-# Copyright (c) 2010 Xavier Garcia
+# Copyright (c) 2010 Xavier Garcia xavi.garcia@gmail.com
 # All rights reserved.
 # 
 # Redistribution and use in source and binary forms, with or without
