@@ -146,6 +146,7 @@ try:
 	request_command_resource="/proxy/express/browse.php?u=http%%3A%%2F%%2F%s/get.html" % hidden_service
 	response_command_resource="/proxy/express/browse.php?u=http%%3A%%2F%%2F%s/put.html" % hidden_service
 	port="80"
+	server="tor-proxy.net"
 
 except KeyError:
 	request_command_resource="/get.html" 
