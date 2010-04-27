@@ -64,6 +64,7 @@ def execution_response(cmd):
 	values = { 'cmd' : binascii.hexlify(encrypt(cmd,passwd)), 'key': binascii.hexlify(rsa.encrypt(passwd,public)) }
 	data = urllib.urlencode(values)
 	conn = urllib.urlopen('http://%s:%s%s' % (server,port,response_command_resource),data)
+	# verify that the data has arrived ??
 	result=conn.read()
 
 

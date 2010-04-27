@@ -174,8 +174,8 @@ class TorHandler(BaseHTTPRequestHandler):
 
 def main():
     try:
-        #server = HTTPServer(('', 8080), TorHandler)
-        server = HTTPServer(('127.0.0.1', 8080), TorHandler)
+        server = HTTPServer(('', 8080), TorHandler)
+        #server = HTTPServer(('127.0.0.1', 8080), TorHandler)
         print 'started httpserver...'
         server.serve_forever()
     except KeyboardInterrupt:
