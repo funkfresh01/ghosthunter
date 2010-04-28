@@ -1,19 +1,17 @@
 #! /bin/sh
 
-build:client server
-	mkdir bin
-	cp build_server/server bin/
-	cp build_client/client bin/
-client:
-	/usr/bin/python freeze.py -q -o  ./build_client ./src/client.py
-	cd build_client && make CC="gcc -pthread -static"
-	cd ..
+build:
+	mkdir -p bin build
+	cat src/pytor.py | sed -e "s/private={.*}/private='stripped'/g" > build/client.py
+	# We have stripped the private key from the client
+	sleep 10
+	/usr/bin/python freeze.py -q -o  ./build -x readline ./build/client.py
+	#cd build && make CC="gcc -pthread -static"
+	cd build && make
+	strip -s -v  build/client
+	cp -p build/client bin/
 
-server:
-	/usr/bin/python freeze.py -q -o  ./build_server ./src/server.py
-	cd build_server && make 
-	cd ..
 
 clean:
-	rm -rf build* bin*
+	rm -rf build bin
 	find . -name "*.pyc" -exec rm -rf {} \;
