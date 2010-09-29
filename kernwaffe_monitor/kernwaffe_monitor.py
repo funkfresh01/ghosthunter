@@ -123,6 +123,15 @@ def usage():
 
 def main(argv=None):
 	notify=False
+	newmap=False
+	config={"kw1":"","kw2":"","kw3":""}
+	config["kw1"]={"hostname":"et.kernwaffe.de" , "port":27960}
+	config["kw2"]={"hostname":"et2.kernwaffe.de", "port":27960}
+	config["kw3"]={"hostname":"et3.kernwaffe.de", "port":27960}
+	timer=60 #controls when we are going to do the next iteration
+
+	servers={}
+
 	try:
 		opts, args = getopt.getopt(sys.argv[1:], "hn")
 	except getopt.GetoptError, err:
@@ -140,58 +149,44 @@ def main(argv=None):
 		else:
 		    assert False, "unhandled option"
 
-	kw1= EtServer("et.kernwaffe.de",27960)
-	kw2= EtServer("et2.kernwaffe.de",27960)
-	kw3= EtServer("et3.kernwaffe.de",27960)
+
+	#we create the server instances
+	for entry in config.keys():
+		servers[entry]=EtServer(config[entry]["hostname"],config[entry]["port"])
+
 
 	if not notify:
-		kw1.fetchData()
-		kw2.fetchData()
-		kw3.fetchData()
-		print "kw1:%s|%s/%s" % (kw1.getMapName(),kw1.getCurrentClients(),kw1.getMaxClients())
-		print "kw2:%s|%s/%s" % (kw2.getMapName(),kw2.getCurrentClients(),kw2.getMaxClients())
-		print "kw3:%s|%s/%s" % (kw3.getMapName(),kw3.getCurrentClients(),kw3.getMaxClients())
+		# just print out the listing to the console
+		for entry in servers.keys():
+			servers[entry].fetchData()
+			servers[entry].resetNewMapFlag()
+			print "%s:%s|%s/%s" % (entry,servers[entry].getMapName(),servers[entry].getCurrentClients(),servers[entry].getMaxClients())
 		sys.exit(0)	
 	
 	else:	
+		# We enable de displayer and we run an infinite loop
 		dmsg=MessageDisplayer()
-
 		#First initial message	
-		kw1.fetchData()
-		kw1.resetNewMapFlag()
-		kw2.fetchData()
-		kw2.resetNewMapFlag()
-		kw3.fetchData()
-		kw3.resetNewMapFlag()
 		message=""
-		message+="kw1: %s | %s/%s\n" % (kw1.getMapName(),kw1.getCurrentClients(),kw1.getMaxClients())
-		message+="kw2: %s | %s/%s\n" % (kw2.getMapName(),kw2.getCurrentClients(),kw2.getMaxClients())
-		message+="kw3: %s | %s/%s\n" % (kw3.getMapName(),kw3.getCurrentClients(),kw3.getMaxClients())
+		for entry in servers.keys():
+			servers[entry].fetchData()
+			servers[entry].resetNewMapFlag()
+			message+="%s:%s|%s/%s\n" % (entry,servers[entry].getMapName(),servers[entry].getCurrentClients(),servers[entry].getMaxClients())
 		dmsg.displayMsg("Kernwaffe monitor initialized", message)
 	
 		while True:
-			time.sleep(30)
-			kw1.fetchData()
-			kw2.fetchData()
-			kw3.fetchData()
-			if kw1.getNewMapFlag() or kw2.getNewMapFlag() or kw3.getNewMapFlag():
-				if kw1.getNewMapFlag():
-					print "new flag on kw1"
-					print "kw1:%s|%s/%s" % (kw1.getMapName(),kw1.getCurrentClients(),kw1.getMaxClients())
-					kw1.resetNewMapFlag()
-				if kw2.getNewMapFlag():
-					print "new flag on kw2"
-					print "kw2:%s|%s/%s" % (kw2.getMapName(),kw2.getCurrentClients(),kw2.getMaxClients())
-					kw2.resetNewMapFlag()
-				if kw3.getNewMapFlag():
-					print "new flag on kw3"
-					print "kw3:%s|%s/%s" % (kw3.getMapName(),kw3.getCurrentClients(),kw3.getMaxClients())
-					kw3.resetNewMapFlag()
-				message=""
-				message+="kw1: %s | %s/%s\n" % (kw1.getMapName(),kw1.getCurrentClients(),kw1.getMaxClients())
-				message+="kw2: %s | %s/%s\n" % (kw2.getMapName(),kw2.getCurrentClients(),kw2.getMaxClients())
-				message+="kw3: %s | %s/%s\n" % (kw3.getMapName(),kw3.getCurrentClients(),kw3.getMaxClients())
+			time.sleep(timer)
+			message=""
+			for entry in servers.keys():
+				servers[entry].fetchData()
+				if servers[entry].getNewMapFlag():
+					newmap=True
+					servers[entry].resetNewMapFlag()
+				message+="%s:%s|%s/%s\n" % (entry,servers[entry].getMapName(),servers[entry].getCurrentClients(),servers[entry].getMaxClients())
+			if newmap:
 				dmsg.displayMsg("Kernwaffe Status Updated", message)
+				newmap=False
+
 
 if __name__ == "__main__":
         sys.exit(main())
