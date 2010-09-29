@@ -115,7 +115,7 @@ class MessageDisplayer:
 
 
 	def displayMsg(self,title,message):
-		msgHandler = pynotify.Notification(title, message)
+		msgHandler = pynotify.Notification(title, message,"dialog-information")
 		msgHandler.show()
 
 
