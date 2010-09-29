@@ -37,7 +37,7 @@ class EtServer:
 	max_clients=0
 	server_name=""
 	port_number=0
-	map_name=""
+	map_name="unknown"
 	mod=""
 	mod_version=""
 	sv_punkbuster=[]
@@ -53,34 +53,38 @@ class EtServer:
 		s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
 		MSG = "\xFF\xFF\xFF\xFFgetstatus\x00"
 		details=[]
-		s.connect((self.server_name,self.port_number))
-		if len(MSG) != s.send(MSG):
-			# where to get error message "$!".
-			print "cannot send to %s(%d):" % (HOSTNAME,PORTNO)
-			raise SystemExit(1)
-		
-		data = s.recv(20480)
-		s.close()
-		details=data.split("\\")
-		
-		for item in range(1, len(details)):
-			value=details[item]
-			if value=="mod_version":
-				self.mod_version=details[item+1]
-			elif value=="gamename":
-				self.mod=details[item+1]
-			elif value=="mapname":
-				if self.map_name!= details[item+1]:
-					self.newmap_flag=True
-				self.map_name=details[item+1]
-			elif value=="sv_maxclients":
-				self.max_clients=details[item+1]
-			elif value=="sv_punkbuster":
-				self.sv_punkbuster=details[item+1].split("\n")
-				self.sv_punkbuster.pop(0)
-				self.sv_punkbuster.pop(len(self.sv_punkbuster)-1)
-			elif value=="timelimit":
-				self.timelimit=details[item+1]
+		try:
+			s.connect((self.server_name,self.port_number))
+			if len(MSG) != s.send(MSG):
+				# where to get error message "$!".
+				print "cannot send to %s(%d):" % (HOSTNAME,PORTNO)
+				raise SystemExit(1)
+			
+			data = s.recv(20480)
+			s.close()
+			details=data.split("\\")
+			
+			for item in range(1, len(details)):
+				value=details[item]
+				if value=="mod_version":
+					self.mod_version=details[item+1]
+				elif value=="gamename":
+					self.mod=details[item+1]
+				elif value=="mapname":
+					if self.map_name!= details[item+1]:
+						self.newmap_flag=True
+					self.map_name=details[item+1]
+				elif value=="sv_maxclients":
+					self.max_clients=details[item+1]
+				elif value=="sv_punkbuster":
+					self.sv_punkbuster=details[item+1].split("\n")
+					self.sv_punkbuster.pop(0)
+					self.sv_punkbuster.pop(len(self.sv_punkbuster)-1)
+				elif value=="timelimit":
+					self.timelimit=details[item+1]
+		except:
+			pass
+			#print "No network available or hostname %s is invalid" % self.server_name
 
 	def resetNewMapFlag(self):
 		self.newmap_flag=False
