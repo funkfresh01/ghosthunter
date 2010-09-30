@@ -51,6 +51,8 @@ class EtServer:
 
 	def fetchData(self):
 		s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+		s.settimeout(10)
+		
 		MSG = "\xFF\xFF\xFF\xFFgetstatus\x00"
 		details=[]
 		try:
