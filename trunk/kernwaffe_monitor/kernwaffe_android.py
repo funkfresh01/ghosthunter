@@ -166,6 +166,12 @@ def checkStatus(servers,initial):
 			
 
 
+def initializeDevice():
+	if not droid.wakeLockAcquirePartial():
+		DisplayManager.onScreenNotification("Failed to lock the CPU. The system will go to sleep")
+	time.sleep(5)
+	DisplayManager.onScreenNotification("Kernwaffe monitor initialized")
+
 droid = android.Android()
 def main(argv=None):
 	notify=False
@@ -183,7 +189,7 @@ def main(argv=None):
 	for entry in config.keys():
 		servers[entry]=EtServer(config[entry]["hostname"],config[entry]["port"])
 
-	DisplayManager.onScreenNotification("Kernwaffe monitor initialized")
+	initializeDevice()
 	checkStatus(servers,initial=True)
 
 	while True:
