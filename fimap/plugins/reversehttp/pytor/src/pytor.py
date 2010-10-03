@@ -74,7 +74,7 @@ class rsa:
 	    >>> gcd(42, 6)
 	    6
 	    """
-	    if p<q: return gcd(q, p)
+	    if p<q: return rsa.gcd(q, p)
 	    if q == 0: return p
 	    return rsa.gcd(q, abs(p%q))
 	
