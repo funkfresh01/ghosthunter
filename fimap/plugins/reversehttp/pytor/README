@@ -40,13 +40,12 @@ Setup
 
 The python scripts are located in the src subdirectory.
 
-* Generationg RSA keys
+* Generating RSA keys
 Before using this reverse shell, a new pair of keys must be
 generated. This can be done by executing this script:
 src/gen_rsa_keys.py. Once we have the keys, the variables
-public and private in both scripts must be modified with
-the new keys. (TO BE INTEGRATED IN THE MAIN CODE. IT IS NOT
-CURRENTLY WORKING)
+public and private in the script must be modified with
+the new keys. 
 
 * Server: 
 The user must install Tor in a computer and setup a hidden
@@ -70,7 +69,7 @@ you configured in your computer.
 
 Usage
 -----
-Pytor is configured by exporting environment variables.
+The only way to configure Tor is exporting environment variables
 
 - Server mode:
   The server will listen in any IP address, port 8080
@@ -78,7 +77,7 @@ Pytor is configured by exporting environment variables.
 
 - Client mode:
   * NEXT_REQUEST="10"
-    The client sleeps 10 seconds between connections
+    The client sleeps 10 seconds between each connection 
     to the server. The special value -1 indicates there is no
     next request (default).
 
