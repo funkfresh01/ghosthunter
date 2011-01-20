@@ -355,12 +355,16 @@ class TeamspeakApplet:
 		self.numPlayers=len(self.players)
 		self.button_display_players.set_label(self.numPlayersBannerLabel % (self.numPlayers))
 		self.label_window_body.set_text("\n".join(self.players))
-		print "pong"
 
 	def pollServer(self,event):
 		ts=Teamspeak()
-		ts.fetchPlayers()
-		self.players=ts.getPlayers()
+		try:
+			print "ping"
+			ts.fetchPlayers()
+			self.players=ts.getPlayers()
+			print "pong"
+		except:
+			print "Error downloading the player list"
 		self.updateApplet()
 
 		return 1
