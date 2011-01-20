@@ -11,6 +11,7 @@ import gnomeapplet
 import gtk
 import gobject
 import string
+import webbrowser
 
 
 # Copyright (c) 2009 Christoph Heer (Christoph.Heer@googlemail.com)
@@ -278,7 +279,9 @@ class TeamspeakApplet:
 	def __init__(self):
 		self.pollInterval=60000
 		self.numPlayers=0
-		self.numPlayersBanner="%s players connected" % (self.numPlayers)
+		self.url="http://www.vereinte-nationen.de/kw_joomla/component/option,com_wrapper/Itemid,13/lang,en/"
+		self.numPlayersBannerLabel="Teamspeak: %s players connected"
+		self.numPlayersBanner=self.numPlayersBannerLabel % (self.numPlayers)
 		gobject.timeout_add(self.pollInterval,self.pollServer, self)
         	self.window = gtk.Window()
 
@@ -287,21 +290,33 @@ class TeamspeakApplet:
 	
 
 	def initWindow(self):
-		self.window.set_default_size(250, 300)
+		self.window.set_default_size(250, 100)
         	self.window.set_title("Players")
 		self.window_container = gtk.VBox(False, 0)
 		self.window.add(self.window_container)
+
 		self.label_window_title=gtk.Label("")
 		self.label_window_title.set_markup("<b>List of connected players</b>")
 		self.window_container.pack_start(self.label_window_title,False,False,0)
 
 		self.label_window_body=gtk.Label("")
-		self.label_window_body.set_markup("<b>playerX</b>")
-		self.window_container.pack_start(self.label_window_body,False,False,0)
+		self.label_window_body.set_justify(gtk.JUSTIFY_FILL)
+		self.label_window_body.set_line_wrap(True)
+		self.frame_window_body=gtk.Frame("Now online")
+		self.frame_window_body.add(self.label_window_body)
+		self.window_container.pack_start(self.frame_window_body,False,False,0)
+
+
+		self.label_window_footer=gtk.LinkButton(self.url, "Ts3 Live View")
+		self.window_container.pack_start(self.label_window_footer,False,False,0)
+
 
 
 		self.window.connect("delete_event", self.destroyWindow)
 		self.label_window_title.show()
+		self.label_window_body.show()
+		self.frame_window_body.show()
+		self.label_window_footer.show()
 		self.window_container.show()
 
 	def destroyWindow(self, widget, event, data=None):
@@ -311,13 +326,9 @@ class TeamspeakApplet:
 	
 	def initApplet(self):
 		self.hbox = gtk.HBox(False, 5)
-        	self.button_display_players = gtk.Button("Display players")
+        	self.button_display_players = gtk.Button(self.numPlayersBanner)
 		self.button_display_players.connect("button_press_event", self.displayPlayers)
-        	self.label_num_players = gtk.Label(self.numPlayersBanner)
-        	self.label_num_players.set_justify(gtk.JUSTIFY_LEFT)
-
     		self.hbox.pack_start(self.button_display_players)
-        	self.hbox.pack_start(self.label_num_players)
         	applet.add(self.hbox)
 		applet.show_all()
 
@@ -328,6 +339,8 @@ class TeamspeakApplet:
 	def displayPlayers(self,widget, event):
 		if event.button==1:
 			self.window.show()
+		elif event.button==2:
+			webbrowser.open_new(self.url)
 
 		# right click go to the website
 
@@ -339,28 +352,20 @@ class TeamspeakApplet:
 
 
 	def updateApplet(self):
-		self.label_num_players.set_text("%s players connected" % (self.numPlayers))
-
-		print self.players
+		self.numPlayers=len(self.players)
+		self.button_display_players.set_label(self.numPlayersBannerLabel % (self.numPlayers))
+		self.label_window_body.set_text("\n".join(self.players))
+		print "pong"
 
 	def pollServer(self,event):
 		ts=Teamspeak()
 		ts.fetchPlayers()
 		self.players=ts.getPlayers()
-		self.numPlayers=len(self.players)
-
 		self.updateApplet()
-
-		print "pong!"
 
 		return 1
 
 
-def factory(applet, iid):
-	tsa=TeamspeakApplet()
-	tsa.loadApplet(applet)
-	tsa.pollServer(applet.event)
-	return True
 
 
 class Teamspeak:
@@ -390,6 +395,11 @@ class Teamspeak:
 		
 
 
+def factory(applet, iid):
+	tsa=TeamspeakApplet()
+	tsa.loadApplet(applet)
+	tsa.pollServer(applet.event)
+	return True
 
 if len(sys.argv) == 2:
 	if sys.argv[1] == "run-in-window":
