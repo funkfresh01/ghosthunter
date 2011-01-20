@@ -10,7 +10,6 @@ import sys
 import gnomeapplet
 import gtk
 import gobject
-import PyTS3
 import string
 
 
@@ -341,7 +340,7 @@ class Teamspeak:
 		self.players=[]
 
 	def fetchPlayers(self):
-		ts3 = PyTS3.ServerQuery(self.ServerIP, self.TS3QueryPort)
+		ts3 = ServerQuery(self.ServerIP, self.TS3QueryPort)
 		ts3.connect()
 		ts3.command('use', {'sid': self.ServerID})
 		ts3.command('clientupdate', {'client_nickname': self.myNick,'client_output_muted':1,'client_input_muted':1})
