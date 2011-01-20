@@ -276,7 +276,7 @@ class ServerNotification(ServerQuery):
 
 class TeamspeakApplet:
 	def __init__(self):
-		self.pollInterval=30000
+		self.pollInterval=60000
 		self.numPlayers=0
 		self.numPlayersBanner="%s players connected" % (self.numPlayers)
 		gobject.timeout_add(self.pollInterval,self.pollServer, self)
@@ -294,6 +294,11 @@ class TeamspeakApplet:
 		self.label_window_title=gtk.Label("")
 		self.label_window_title.set_markup("<b>List of connected players</b>")
 		self.window_container.pack_start(self.label_window_title,False,False,0)
+
+		self.label_window_body=gtk.Label("")
+		self.label_window_body.set_markup("<b>playerX</b>")
+		self.window_container.pack_start(self.label_window_body,False,False,0)
+
 
 		self.window.connect("delete_event", self.destroyWindow)
 		self.label_window_title.show()
