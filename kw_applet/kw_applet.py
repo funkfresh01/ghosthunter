@@ -12,6 +12,7 @@ import gtk
 import gobject
 import string
 import webbrowser
+import pynotify
 
 
 # Copyright (c) 2009 Christoph Heer (Christoph.Heer@googlemail.com)
@@ -285,7 +286,9 @@ class TeamspeakApplet:
 		gobject.timeout_add(self.pollInterval,self.pollServer, self)
         	self.window = gtk.Window()
 
-		self.players=[]
+		self.players={}
+
+		self.dmsg=MessageDisplayer()
 
 	
 
@@ -357,14 +360,53 @@ class TeamspeakApplet:
 		self.label_window_body.set_text("\n".join(self.players))
 
 	def pollServer(self,event):
+		playerList=[]
+		deletedList=[]
+		joinedList=[]
+
 		ts=Teamspeak()
 		try:
 			print "ping"
 			ts.fetchPlayers()
-			self.players=ts.getPlayers()
+			
+			#we mark all the players as old/offline
+	       		for player in self.players:
+				self.players[player]['online']=False
+			playerList=ts.getPlayers()
+
+
+			for player in playerList:
+				#We access the dict. to cause a KeyError
+				try:
+					self.players[player]
+					self.players[player]={'online':True,'lastseen':True}
+				except KeyError:
+					self.players[player]={'online':True,'lastseen':False}
+	
+			for player in self.players:			
+				if not self.players[player]['online']:
+					deletedList.append(player)
+				
+				elif not self.players[player]['lastseen']:
+					joinedList.append(player)
+					print "%s joined the server" % player
+
+			for player in deletedList:
+				print "%s left the server" % player
+	       			del self.players[player]
+
+			if len(joinedList) >0 or len(deletedList) >0:
+				displaymsg=""
+				if len(joinedList) >0:
+					displaymsg=displaymsg+"The following players joined the server:\n%s\n" % (", ".join(joinedList))
+				if len(deletedList) >0:
+					displaymsg=displaymsg+"The following players left the server:\n%s\n" % (", ".join(deletedList))
+				self.dmsg.displayMsg("Teamspeak update notification",displaymsg)
+
+			
 			print "pong"
 		except:
-			print "Error downloading the player list"
+			print "Error updating the playerlist"
 		self.updateApplet()
 
 		return 1
@@ -387,7 +429,7 @@ class Teamspeak:
 		ts3.connect()
 		ts3.command('use', {'sid': self.ServerID})
 		ts3.command('clientupdate', {'client_nickname': self.myNick,'client_output_muted':1,'client_input_muted':1})
-		
+
 		for client in  ts3.command('clientlist'):
 			if client["client_nickname"]!= self.myNick:
 				self.players.append(client["client_nickname"])
@@ -396,6 +438,18 @@ class Teamspeak:
 	def getPlayers(self):
 		return self.players
 		
+
+class MessageDisplayer:
+	msgHandler=None
+
+	def __init__(self):
+		if not pynotify.init("Teamspeak applet"):
+			raise Exception("there was a problem initializing the pynotify module")
+
+
+	def displayMsg(self,title,message):
+		msgHandler = pynotify.Notification(title, message,"dialog-information")
+		msgHandler.show()
 		
 
 
