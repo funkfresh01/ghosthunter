@@ -1,0 +1,27 @@
+Install
+-------
+
+* Install the applet
+
+sudo cp kw_applet.py copy /usr/local/bin/
+sudo chmod 755   /usr/local/bin/kw_applet.py
+
+* configure the applet
+sudo cp kw_applet.server/usr/lib/bonobo/servers
+
+* Add the applet to the panel the usual way
+
+
+
+Dependences
+-----------
+python-gtk2
+python-gnomeapplet
+python-notify
+
+
+TODO
+----
+- Specify on which channel the player
+- Colors, icons and shiny stuff
+- Is the microphone/headphone muted?
