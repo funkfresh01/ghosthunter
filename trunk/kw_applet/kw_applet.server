@@ -9,7 +9,7 @@
 		<oaf_attribute name="description" type="string" value="Teampeak viewer"/>
 	</oaf_server>
 
-	<oaf_server iid="OAFIID:Teamspeak_Factory" type="factory" location="OAFIID:Teamspeak_Factory">
+	<oaf_server iid="OAFIID:Teamspeak" type="factory" location="OAFIID:Teamspeak_Factory">
 		<oaf_attribute name="repo_ids" type="stringv">
 			<item value="IDL:GNOME/Vertigo/PanelAppletShell:1.0"/>
 			<item value="IDL:Bonobo/Control:1.0"/>
