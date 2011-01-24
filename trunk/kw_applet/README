@@ -22,6 +22,6 @@ python-notify
 
 TODO
 ----
-- Specify on which channel the player
+- Specify on which channel the player is connected to
 - Colors, icons and shiny stuff
 - Is the microphone/headphone muted?
