@@ -295,7 +295,7 @@ class TeamspeakApplet:
 	def initWindow(self):
 		self.window.set_default_size(250, 100)
         	self.window.set_title("Players")
-		self.window_container = gtk.VBox(False, 0)
+		self.window_container = gtk.VBox(False, 10)
 		self.window.add(self.window_container)
 
 		self.label_window_title=gtk.Label("")
@@ -327,13 +327,18 @@ class TeamspeakApplet:
 		return True
 
 	
-	def initApplet(self):
-		self.hbox = gtk.HBox(False, 5)
-        	self.button_display_players = gtk.Button(self.numPlayersBanner)
-		self.button_display_players.connect("button_press_event", self.displayPlayers)
-    		self.hbox.pack_start(self.button_display_players)
-        	applet.add(self.hbox)
+	def initApplet(self,applet):
+		self.main_box = gtk.EventBox()
+		applet.add(self.main_box)
+		self.main_box.show()
+		
+		self.label_display_players = gtk.Label(self.numPlayersBanner)
+		self.main_box.connect("button_press_event", self.displayPlayers)
+		self.main_box.add(self.label_display_players)
 		applet.show_all()
+
+
+
 
 
 
@@ -349,14 +354,14 @@ class TeamspeakApplet:
 
 	def loadApplet(self,applet):
 		self.applet=applet
-		self.initApplet()
+		self.initApplet(applet)
 		self.initWindow()
 
 
 
 	def updateApplet(self):
 		self.numPlayers=len(self.players)
-		self.button_display_players.set_label(self.numPlayersBannerLabel % (self.numPlayers))
+		self.label_display_players.set_text(self.numPlayersBannerLabel % (self.numPlayers))
 		self.label_window_body.set_text("\n".join(self.players))
 
 	def pollServer(self,event):
@@ -454,10 +459,16 @@ class MessageDisplayer:
 
 
 def factory(applet, iid):
+
+	applet.show_all()
 	tsa=TeamspeakApplet()
 	tsa.loadApplet(applet)
 	tsa.pollServer(applet.event)
 	return True
+
+
+
+
 
 if len(sys.argv) == 2:
 	if sys.argv[1] == "run-in-window":
