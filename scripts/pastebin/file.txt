@@ -1,0 +1,22 @@
+@facebook\.com
+@gmail\.com
+@yahoo\.com
+@comcast\.net
+@aol\.com
+@hotmail\.com
+@verizon\.net
+[\w\-][\w\-\.]+@[\w\-][\w\-\.]+[a-zA-Z]{1,4}
+union.+select.+from
+-----BEGIN RSA PRIVATE KEY-----
+-----BEGIN DSA PRIVATE KEY-----
+-----BEGIN PGP SIGNED MESSAGE-----
+\s\w{32}\s
+-- phpMyAdmin SQL Dump
+-- MySQL dump
+-----BEGIN OpenVPN Static key V1-----
+-----BEGIN CERTIFICATE-----
+INSERT INTO
+CREATE TABLE
+http://\w{1,}:\w{1,}/
+social.+security.+\d{16}
+credit.+card.+\d{9}
