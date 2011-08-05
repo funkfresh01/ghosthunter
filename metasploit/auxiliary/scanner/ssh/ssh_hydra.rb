@@ -99,7 +99,7 @@ class Metasploit3 < Msf::Auxiliary
 		logfile=fd.path
 		fd.close
 		print_status("#{ip}:#{rport}  #{credentials} - Calling Hydra")
-		print_status(%x[hydra -f -o #{logfile} -w #{timeout} -t #{threads} -s #{rport} -C #{credentials} #{ip}  ssh2])
+		%x[hydra -f -o #{logfile} -w #{timeout} -t #{threads} -s #{rport} -C #{credentials} #{ip}  ssh2]
 		File.open(logfile, "r") do |infile|
 			while (line = infile.gets)
 				test= line =~ /^\[#{rport}\]\[ssh2\] host: #{ip}   login: (.*)   password: (.*)$/
