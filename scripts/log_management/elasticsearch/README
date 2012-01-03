@@ -1,0 +1,15 @@
+
+* elasticsearch.py
+
+Parses the log files and stores them in the search engine.
+
+* search.py
+
+Make searches on the indexed log files. Output:
+
+transaction: E324DA41CA
+from:   me@foo.com
+msgid:  4EDC80B6.8040107@smtp.foo.com
+date:   Dec  5 09:28:42
+to:     recipent='you@bar.com' , relay='smtp.bar.com[10.10.10.1]:25', status='sent (250 2.0.0 pB58ShMJ024096 Message accepted for delivery)'
+host:   smtp1
