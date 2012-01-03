@@ -1,0 +1,3 @@
+The script init.sh creates a new index with an expiration of 90 days
+
+It assumes that elasticsearch is listening on localhost port 9200.
