@@ -34,97 +34,153 @@ import getopt
 import os.path
 import os
 import calendar
-import datetime
+from datetime import datetime
 import time
 import json
 import urllib2
+import urllib
 
 
 
-client_regexp_postfix=re.compile("^(\\w{1,3}\\s{1,2}\\d{1,2} \\d{2}:\\d{2}:\\d{2}) (\w+) postfix/smtpd\[\d+\]: (\w{1,11}): client=([\w\.\-\_]+\[[0-9.]+\]).*$")
-from_regexp_postfix=re.compile("^(\\w{1,3}\\s{1,2}\\d{1,2} \\d{2}:\\d{2}:\\d{2}) \w+ postfix/qmgr\[\d+\]: (\w{1,11}): from=<(.*)>.*$")
-removed_regexp_postfix=re.compile("^(\\w{1,3}\\s{1,2}\\d{1,2} \\d{2}:\\d{2}:\\d{2}) \w+ postfix/qmgr\[\d+\]: (\w{1,11}): removed")
-msgid_regexp_postfix=re.compile("^(\\w{1,3}\\s{1,2}\\d{1,2} \\d{2}:\\d{2}:\\d{2}) \w+ postfix/cleanup\[\d+\]: (\w{1,11}): message-id=<(.*)>$")
-to_regexp_postfix=re.compile("^(\\w{1,3}\\s{1,2}\\d{1,2} \\d{2}:\\d{2}:\\d{2}) \w+ postfix/smtp\[\d+\]: (\w{1,11}): to=<(.*)>, relay=([\w\.]+\[[0-9.]+\]:\d{1,5}), delay=[0-9.]{1,4}, delays=[0-9.]{1,4}/[0-9.]{1,4}/[0-9.]{1,4}/[0-9.]{1,4}, dsn=[0-9.]{5}, status=(\w+ \(.+\))$")
-local_regexp_postfix=re.compile("^(\\w{1,3}\\s{1,2}\\d{1,2} \\d{2}:\\d{2}:\\d{2}) \w+ postfix/local\[\d+\]: (\w{1,11}): to=<(.*)>, relay=(.+), delay=[0-9.]{1,4}, delays=[0-9.]{1,4}/[0-9.]{1,4}/[0-9.]{1,4}/[0-9.]{1,4}, dsn=[0-9.]{5}, status=(\w+ \(.+\))$")
+client_regexp_postfix=re.compile("^(\w+) postfix/smtpd\[\d+\]: (\w{1,11}): client=([\w\.\-\_]+\[[0-9.]+\]).*$")
+from_regexp_postfix=re.compile("^\w+ postfix/qmgr\[\d+\]: (\w{1,11}): from=<(.*)>.*$")
+removed_regexp_postfix=re.compile("^\w+ postfix/qmgr\[\d+\]: (\w{1,11}): removed")
+msgid_regexp_postfix=re.compile("^\w+ postfix/cleanup\[\d+\]: (\w{1,11}): message-id=<(.*)>$")
+to_regexp_postfix=re.compile("^\w+ postfix/smtp\[\d+\]: (\w{1,11}): to=<(.*)>, relay=([\w\.]+\[[0-9.]+\]:\d{1,5}), delay=[0-9.]{1,4}, delays=[0-9.]{1,4}/[0-9.]{1,4}/[0-9.]{1,4}/[0-9.]{1,4}, dsn=[0-9.]{5}, status=(\w+ \(.+\))$")
+local_regexp_postfix=re.compile("^\w+ postfix/local\[\d+\]: (\w{1,11}): to=<(.*)>, relay=(.+), delay=[0-9.]{1,4}, delays=[0-9.]{1,4}/[0-9.]{1,4}/[0-9.]{1,4}/[0-9.]{1,4}, dsn=[0-9.]{5}, status=(\w+ \(.+\))$")
 
-from_regex_sendmail= re.compile("(\\w{1,3}\\s{1,2}\\d{1,2} \\d{2}:\\d{2}:\\d{2}) (\w+).*? (\\S+?): from=<?(.*?)>?, size=(.*?), class=(.*?),(?: pri=(.*?),)? nrcpts=(.*?),(?: msgid=<?(.*?)>?,)? (?:bodytype=(.*?), )?(?:proto=(.*?), )?(?:daemon=(.*?), )?relay=(.* \\[.*\\]).*$")
-to_regex_sendmail=re.compile("(\\w{1,3}\\s{1,2}\\d{1,2} \\d{2}:\\d{2}:\\d{2}).*? (\\S+?): to=<?(.*?)>?,(?: ctladdr=<?(.*?)>? [^,]*,)? delay=(.*?),(?: xdelay=(.*?),)? mailer=(.*?),(?: pri=(.*?),)?(?: relay=(.*?) \\[(.*?)\\],)?(?: dsn=(.*?),)? stat=(\\w+):? (.*)");
-
-
+from_regex_sendmail= re.compile("(\w+).*? (\\S+?): from=<?(.*?)>?, size=(.*?), class=(.*?),(?: pri=(.*?),)? nrcpts=(.*?),(?: msgid=<?(.*?)>?,)? (?:bodytype=(.*?), )?(?:proto=(.*?), )?(?:daemon=(.*?), )?relay=(.* \\[.*\\]).*$")
+to_regex_sendmail=re.compile(".*? (\\S+?): to=<?(.*?)>?,(?: ctladdr=<?(.*?)>? [^,]*,)? delay=(.*?),(?: xdelay=(.*?),)? mailer=(.*?),(?: pri=(.*?),)?(?: relay=(.*?) \\[(.*?)\\],)?(?: dsn=(.*?),)? stat=(\\w+):? (.*)");
 
 
-def parse_logs(logfile):
+def query_server(query):
+	global server
+	global port
+	global number_results
+
+	dict_response=[]
+	try:
+
+		req = urllib2.Request('http://%s:%s/graylog2/message/_search?size=%s' % (server,port,number_results), query , {'Content-Type': 'application/json'})
+		f = urllib2.urlopen(req,timeout=300)
+		response = f.read()
+		dict_response=json.loads(response)
+		f.close()
+	except urllib2.URLError:
+		print "Query failed timeout"
+	return dict_response
+
+
+def write_server(key,trans_dict):
+	global server
+	global port
+	try:
+		req = urllib2.Request('http://%s:%s/email_transactions/transactions/%s' % (server,port,key), json.dumps(trans_dict[key]), {'Content-Type': 'application/json'})
+		f = urllib2.urlopen(req,timeout=300)
+		response = f.read()
+		f.close()
+	except TypeError:
+		print "%s failed" %key
+		pass
+	except urllib2.HTTPError:
+		print "%s failed HTTPError" %key
+		pass
+	except urllib2.URLError:
+		print "%s failded timeout"
+
+def build_simple_query():
+	global time_frame
+	mytime=(time.time() - (60*time_frame)) #delta time used to search the logs
+        return '{"from":0,"filter":{"range":{"created_at":{"gt":%s,"lt":null}}},"sort":[{"created_at":"desc"}],"query":{"bool":{"must":[{"query_string":{"query":"message:postfix OR sendmail"}}]}}}' % str(mytime)
+
+
+def simple_search():
+	results=[]
+	dict_response=[]
+	dict_response=query_server(build_simple_query())
+	try:
+		results=dict_response['hits']['hits']
+	except KeyError:
+		pass
+	except TypeError:
+		pass
+	return results
+
+
+def parse_logs():
 	transactions={}
-	
-	if logfile=="-":
-		for line in sys.stdin.readlines():
-			parse_postfix_extract_info(line.strip('\n'),transactions) or parse_sendmail_extract_info(line.strip('\n'),transactions)
-	else:
-		for line in fileinput.input(logfile):
-			parse_postfix_extract_info(line.strip('\n'),transactions) or parse_sendmail_extract_info(line.strip('\n'),transactions)
+
+	for log_line in simple_search():
+		#We add the host to the log line
+		timestamp=int(log_line['_source']['created_at'])
+		#trans=log_line['_source']['full_message'].split(" ")
+		trans=log_line['_source']['message'].split(" ")
+		trans.insert(0,log_line['_source']['host'])
+		line=" ".join(trans)
+		parse_postfix_extract_info(line.strip('\n'),timestamp,transactions) or parse_sendmail_extract_info(line.strip('\n'),timestamp,transactions)
+
 	return transactions
 
 
 
-def parse_postfix_extract_info(log_line,transactions):
+def parse_postfix_extract_info(log_line,timestamp,transactions):
 	tmp_dict={}
 	trans_id=""
 
-
 	value=client_regexp_postfix.match(log_line)
 	if value!=None:
-		trans_id=value.groups()[2]
+		trans_id=value.groups()[1]
 		if trans_id not in transactions:
 			transactions[trans_id] = initialize_trans_entry()
-		transactions[trans_id]['date']=value.groups()[0]
-		transactions[trans_id]['client']=value.groups()[3]
-		transactions[trans_id]['host']=value.groups()[1]
+		transactions[trans_id]['date']=time.strftime("%Y-%m-%dT%H:%M:%S",datetime.fromtimestamp(timestamp).timetuple())
+
+		transactions[trans_id]['client']=value.groups()[2]
+		transactions[trans_id]['host']=value.groups()[0]
 		return True
 
 	value=msgid_regexp_postfix.match(log_line)
 	if value!=None:
-		trans_id=value.groups()[1]
+		trans_id=value.groups()[0]
 		if trans_id not in transactions:
 			transactions[trans_id] = initialize_trans_entry()
-		transactions[trans_id]['msgid']=value.groups()[2]
+		transactions[trans_id]['msgid']=value.groups()[1]
 		return True
 
 	value=from_regexp_postfix.match(log_line)
 	if value!=None:
-		trans_id=value.groups()[1]
+		trans_id=value.groups()[0]
 		if trans_id not in transactions:
 			transactions[trans_id] = initialize_trans_entry()
-		transactions[trans_id]['from']=value.groups()[2]
+		transactions[trans_id]['from']=value.groups()[1]
 		return True
 
 
 	value=to_regexp_postfix.match(log_line)
 	if value!=None:
-		trans_id=value.groups()[1]
+		trans_id=value.groups()[0]
 		if trans_id not in transactions:
 			transactions[trans_id] = initialize_trans_entry()
-		transactions[trans_id]['to'].append({'recipient': value.groups()[2],'relay':value.groups()[3],'status': value.groups()[4]})
+		transactions[trans_id]['to'].append({'recipient': value.groups()[1],'relay':value.groups()[2],'status': value.groups()[3]})
 		return True
 
 	value=local_regexp_postfix.match(log_line)
 	if value!=None:
-		trans_id=value.groups()[1]
+		trans_id=value.groups()[0]
 		if trans_id not in transactions:
 			transactions[trans_id] = initialize_trans_entry()
-		transactions[trans_id]['to'].append({'recipient': value.groups()[2],'relay':value.groups()[3],'status': value.groups()[4]})
+		transactions[trans_id]['to'].append({'recipient': value.groups()[1],'relay':value.groups()[2],'status': value.groups()[3]})
 		return True
 
 
 	value=removed_regexp_postfix.match(log_line)
 	if value!=None:
-		trans_id=value.groups()[1]
+		trans_id=value.groups()[0]
 		if trans_id not in transactions:
 			transactions[trans_id] = initialize_trans_entry()
 		return True
 	return False
 
-def parse_sendmail_extract_info(log_line,transactions):
+def parse_sendmail_extract_info(log_line,timestamp,transactions):
 	tmp_dict={}
 	trans_id=""
 	global to_filter
@@ -132,29 +188,29 @@ def parse_sendmail_extract_info(log_line,transactions):
 
 	value=from_regex_sendmail.match(log_line)
 	if value != None:
-		trans_id=value.groups()[2]
+		trans_id=value.groups()[1]
 		if trans_id not in transactions:
 			transactions[trans_id] = initialize_trans_entry()
 
-		transactions[trans_id]['from']=value.groups()[3].replace('>',"").replace('<',"")
-		transactions[trans_id]['msgid']=value.groups()[8]
-		transactions[trans_id]['client']=value.groups()[12]
-		transactions[trans_id]['host']=value.groups()[1]
+		transactions[trans_id]['from']=value.groups()[2].replace('>',"").replace('<',"")
+		transactions[trans_id]['msgid']=value.groups()[7]
+		transactions[trans_id]['client']=value.groups()[11]
+		transactions[trans_id]['host']=value.groups()[0]
 		return True
 			
 
 
 	value=to_regex_sendmail.match(log_line)
 	if value != None:
-		trans_id=value.groups()[1]
+		trans_id=value.groups()[0]
 		if trans_id not in transactions:
 			transactions[trans_id] = initialize_trans_entry()
 	
-		transactions[trans_id]['relay']=value.groups()[8]
-		transactions[trans_id]['status']=value.groups()[11]
-		transactions[trans_id]['date']=value.groups()[0]
-		for email in value.groups()[2].replace('>',"").replace('<',"").split(','):
-			transactions[trans_id]['to'].append({'recipient': email,'relay':value.groups()[8],'status': "%s %s" % (value.groups()[11],value.groups()[12])})
+		transactions[trans_id]['relay']=value.groups()[7]
+		transactions[trans_id]['status']=value.groups()[10]
+		transactions[trans_id]['date']=time.strftime("%Y-%m-%dT%H:%M:%S",datetime.fromtimestamp(timestamp).timetuple())
+		for email in value.groups()[1].replace('>',"").replace('<',"").split(','):
+			transactions[trans_id]['to'].append({'recipient': email,'relay':value.groups()[7],'status': "%s %s" % (value.groups()[10],value.groups()[11])})
 				
 		return True
 
@@ -174,41 +230,44 @@ def initialize_trans_entry():
 
 
 def help():
-	print "%s is a script that parses Sendmail and Postfix logs looking for e-mail transactions.\n" % os.path.basename(sys.argv[0])
-	print "-l  log file to parse.  - when the log file is piped to stdin"
-	print "-s server where we want to store the transactions"
+	print "-s server runnning elastic search"
 	print "-p port where the server is listening"
-	print "-y We are indexing logs from previous year. Syslog has no year field :p"
+	print "-r number of results to request to the elasticsearch server. 1000000 by default"
+	print "-t time frame in minutes. ie. -t 60 would request the logs from the last 60 minutes"
 
 	
 
 
 def main():
 	global months
-	months=dict((v,k) for k,v in enumerate(calendar.month_abbr))
-	trans_dict={}
-	logfile=""
+	global server
+	global port
+	global number_results
+	global time_frame
+
 	server="127.0.0.1"
 	port="9200"
-	prevYear=False
+	number_results="1000000"
+	trans_dict={}
+	server="127.0.0.1"
+	port="9200"
+	time_frame=60
 	pidfile = "/var/tmp/elasticsearch_indexer.pid"
 
 
 	try:
-		options, args = getopt.getopt(sys.argv[1:], 'l:s:p:r:y')
+		options, args = getopt.getopt(sys.argv[1:], 'p:r:t:')
 	except getopt.GetoptError:
 		    help()
 		    sys.exit(1)
 	try:
 		for o, a in options:
-			if o=="-l":
-				logfile=a
-			elif o=="-s": 
-				server=a
-			elif o=="-p": 
+			if o=="-p": 
 				port=a
-			elif o=="-y": 
-				prevYear=True
+			elif o=="-r": 
+				number_results=a
+			elif o=="-t": 
+				time_frame=int(a)
 			else:
 				help()
 				sys.exit(1)
@@ -232,30 +291,12 @@ def main():
 			os.unlink(pidfile)
 	file(pidfile, 'w').write(pid)
 
-	try:
-		trans_dict = parse_logs(logfile)
-		today=datetime.date.today().timetuple()
-		for msg in trans_dict:
-		
-			# avoid malformed messages	
-			if trans_dict[msg]['client']!= "" and  trans_dict[msg]['host']!="" and trans_dict[msg]['date']!="":
-				ttuple=datetime.datetime.strptime("%s %s" % (datetime.date.today().year,trans_dict[msg]['date']),"%Y %b %d %H:%M:%S").timetuple()
-				
-				# Special case when today is January 1st and we index December 31st
-				if prevYear or (ttuple[1]==12 and ttuple[2]==31 and today[1]==1 and today[2]==1):
-					ttuple=datetime.datetime.strptime("%s %s" % (datetime.date.today().year-1,trans_dict[msg]['date']),"%Y %b %d %H:%M:%S").timetuple()
+	trans_dict = parse_logs()
 
-				trans_dict[msg]['date']=time.strftime("%Y-%m-%dT%H:%M:%S",ttuple)
-				req = urllib2.Request('http://%s:%s/email_transactions/transactions/%s' % (server,port,msg), json.dumps(trans_dict[msg]), {'Content-Type': 'application/json'})
-				f = urllib2.urlopen(req)
-				response = f.read()
-				f.close()
-		os.unlink(pidfile)
-	except IOError:
-		os.unlink(pidfile)
-		print "the log file does not exist"
-		help()
-		sys.exit(1)
+	for key in trans_dict:
+		if trans_dict[key]['client']!= "" and  trans_dict[key]['host']!="" and trans_dict[key]['date']!="":
+			write_server(key,trans_dict)
+	os.unlink(pidfile)
 	
 
 
