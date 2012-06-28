@@ -37,7 +37,7 @@ sub twitter_msg {
       $allowed=1;
   }
   if ($allowed) {
-        if (length($msg) <= 120) {
+        if (length("<$nick>: $msg") <= 120) {
             eval { $nt->update("<$nick>: $msg") };
             if ( $@ ) {
                  print "twitterbot: update failed because: $@\n";
