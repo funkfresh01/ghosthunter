@@ -52,32 +52,28 @@ sub twitter_msg {
 
 sub sig_message_public {
      my ($server, $msg, $nick, $nick_addr, $channel) = @_;
-     @data=split(" ",$msg);
-     if ($channel=~ m/^$my_channel$/) { 
-          if (@data[0]=~ m/^!twitt$/i) {
-	       shift data;
-               twitter_msg($nick,join(" ",@data),$channel,$server);
-          }
-          elsif(@data[0]=~ m/^!twitstatus$/i) {
-              check_timeline($nick,$server);
-          }
-     }
+     manage_cmd($server,$msg,$channel,$nick);
 }
 
 sub sig_message_own_public {
      my ($server, $msg, $channel) = @_;
-     @data=split(" ",$msg);
-     if ($channel=~ m/^$my_channel$/) {
-          if (@data[0]=~ m/^!twitt$/i) {
-	       shift data;
-               twitter_msg($server->{nick},join(" ",@data),$channel,$server);
-          }
-          elsif(@data[0]=~ m/^!twitstatus$/i) {
-              check_timeline($server->{nick},$server);
-          }
-     }
+     manage_cmd($server,$msg,$channel,$server->{nick});
 }
 
+
+sub manage_cmd {
+    my ($server,$msg,$channel,$nick) = @_;
+    @data=split(" ",$msg);
+    if ($channel=~ m/^$my_channel$/) { 
+         if (@data[0]=~ m/^!twitt$/i) {
+              shift data;
+              twitter_msg($nick,join(" ",@data),$channel,$server);
+         }
+         elsif(@data[0]=~ m/^!twitstatus$/i) {
+             check_timeline($nick,$server);
+         }
+    }
+}
 
 sub check_timeline {
     my ($nick, $server) = @_;
