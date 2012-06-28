@@ -15,16 +15,19 @@ $VERSION = "1.0";
 );
 
 
-sub twitter_msg {
-  my ($nick,$msg,$channel,$server) = @_;
-  my $allowed=0;
+sub load_tokens {
   my $nt = Net::Twitter::Lite->new(
     consumer_key    => $consumer_key,
     consumer_secret => $consumer_secret,
   );
   $nt->access_token($access_token);
   $nt->access_token_secret($access_token_secret);
-
+  return $nt;
+}
+sub twitter_msg {
+  my ($nick,$msg,$channel,$server) = @_;
+  my $allowed=0;
+  my $nt = load_tokens();
   if ($server->{nick}!=$nick) {
      if (grep {$_ eq $nick} @access_list) {
          $allowed=1;
@@ -77,14 +80,9 @@ sub manage_cmd {
 
 sub check_timeline {
     my ($nick, $server) = @_;
-    my $nt = Net::Twitter::Lite->new(
-        consumer_key    => $consumer_key,
-        consumer_secret => $consumer_secret,
-    );
-    $nt->access_token($access_token);
-    $nt->access_token_secret($access_token_secret);
+    my $nt = load_tokens();
 
-    my $timeline = $nt->home_timeline({ count => 20 });
+    my $timeline = $nt->home_timeline({ count => 10 });
     my @results = ();
     for my $tweet ( @$timeline ) {
         my @item = ();
