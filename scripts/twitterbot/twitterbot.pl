@@ -24,6 +24,17 @@ sub load_tokens {
   $nt->access_token_secret($access_token_secret);
   return $nt;
 }
+
+sub public_msg {
+    my ($server,$channel,$msg) = @_;
+    $server->command("MSG $channel " . $msg);
+}
+sub private_msg {
+    my ($server,$nick,$msg) = @_;
+    $server->command("MSG $nick " . $msg);
+}
+
+
 sub twitter_msg {
   my ($nick,$msg,$channel,$server) = @_;
   my $allowed=0;
@@ -42,14 +53,14 @@ sub twitter_msg {
             if ( $@ ) {
                  print "twitterbot: update failed because: $@\n";
             }
-            $server->command("MSG $channel twit sent.");
+            public_msg($server,$channel,"twitt sent.");
         }
 	else {
-            $server->command("MSG $channel The message is longer than 120 characters.");
+            public_msg($server,$channel,"The message is longer than 120 characters.");
         }
   }
   else {
-      $server->command("MSG $channel $nick not authorized to twit");
+      public_msg($server,$channel,"$nick not authorized to twit");
   }
 }
 
@@ -111,7 +122,7 @@ sub check_timeline {
         $twit= "$date  $name : $plaintext";
         chomp($twit);
         push @result, $twit;
-        $server->command("MSG $nick " . join("\n",@result));
+        private_msg($server,$nick, join("\n",@result));
    }
 }
 
