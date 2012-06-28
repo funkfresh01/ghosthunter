@@ -35,10 +35,10 @@ sub private_msg {
 }
 
 
-sub twitter_msg {
-  my ($nick,$msg,$channel,$server) = @_;
+sub access_control {
+  my ($nick,$server) = @_; 
   my $allowed=0;
-  my $nt = load_tokens();
+
   if ($server->{nick}!=$nick) {
      if (grep {$_ eq $nick} @access_list) {
          $allowed=1;
@@ -47,7 +47,14 @@ sub twitter_msg {
   else {
       $allowed=1;
   }
-  if ($allowed) {
+  return $allowed;
+}
+
+sub twitter_msg {
+  my ($nick,$msg,$channel,$server) = @_;
+  my $nt = load_tokens();
+
+  if (access_control($nick,$server)) {
         if (length("<$nick>: $msg") <= 120) {
             eval { $nt->update("<$nick>: $msg") };
             if ( $@ ) {
